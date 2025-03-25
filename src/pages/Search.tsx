@@ -10,9 +10,13 @@ import {
   List,
   ChevronDown,
   X,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 const searchResults = [
   {
@@ -188,12 +192,15 @@ const conditions = ["Any Condition", "New", "Like New", "Good", "Fair"];
 const priceRanges = ["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"];
 
 const Search = () => {
+  const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [results, setResults] = useState(searchResults);
   const [animateIn, setAnimateIn] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -203,9 +210,45 @@ const Search = () => {
     return () => clearTimeout(timer);
   }, []);
   
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    console.log("Searching for:", query);
+    
+    if (!query.trim()) {
+      setAiRecommendations([]);
+      return;
+    }
+
+    setIsSearching(true);
+    
+    try {
+      const userGender = session?.user?.user_metadata?.gender || 'unspecified';
+      
+      const { data, error } = await supabase.functions.invoke('thrift-search', {
+        body: { userQuery: query, userGender }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.status === 'success' && data.recommended_searches && data.recommended_searches.length > 0) {
+        setAiRecommendations(data.recommended_searches);
+      } else {
+        setAiRecommendations([]);
+        console.log('No recommended searches found or invalid response format:', data);
+      }
+    } catch (error) {
+      console.error('Error fetching AI recommendations:', error);
+      toast.error('Error getting search recommendations');
+      setAiRecommendations([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
+  const useRecommendedSearch = (recommendedQuery: string) => {
+    setSearchQuery(recommendedQuery);
+    console.log("Using recommended search:", recommendedQuery);
   };
   
   const toggleFilter = (filter: string) => {
@@ -241,6 +284,8 @@ const Search = () => {
               <SearchInput 
                 placeholder="Try 'vintage leather jacket' or 'Y2K baggy jeans'..." 
                 onSearch={handleSearch}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
               
               <div className="absolute right-3 top-3 flex gap-1">
@@ -260,17 +305,37 @@ const Search = () => {
             </div>
           </div>
           
-          {searchQuery && (
-            <div className="mb-6 bg-primary/5 rounded-lg p-4 flex items-start gap-3 animate-fade-in" style={{ animationDelay: '150ms' }}>
-              <div className="bg-primary/10 p-1.5 rounded-full">
-                <Sparkles className="h-5 w-5 text-primary" />
+          {searchQuery && aiRecommendations.length > 0 && (
+            <div className="mb-6 bg-primary/5 rounded-lg p-4 flex flex-col items-start gap-3 animate-fade-in" style={{ animationDelay: '150ms' }}>
+              <div className="flex items-start gap-3 w-full">
+                <div className="bg-primary/10 p-1.5 rounded-full">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-1">AI Enhanced Search</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    We've optimized your search for better results. Try these specific queries:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiRecommendations.map((recommendation, index) => (
+                      <button
+                        key={index}
+                        onClick={() => useRecommendedSearch(recommendation)}
+                        className="bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm hover:bg-primary/20 transition-colors"
+                      >
+                        {recommendation}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium mb-1">AI Enhanced Search</p>
-                <p className="text-sm text-muted-foreground">
-                  We're searching for "{searchQuery}" including similar styles, alternative terms, and related vintage eras.
-                </p>
-              </div>
+            </div>
+          )}
+          
+          {isSearching && (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2 text-muted-foreground">Optimizing your search...</span>
             </div>
           )}
           

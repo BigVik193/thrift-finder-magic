@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -7,30 +7,62 @@ interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onSearch?: (value: string) => void;
   className?: string;
   placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
   onSearch,
   className,
   placeholder = "Search for vintage finds...",
+  value: externalValue,
+  onChange: externalOnChange,
   ...props
 }) => {
-  const [value, setValue] = useState('');
+  const [internalValue, setInternalValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  
+  // Sync with external value if provided
+  useEffect(() => {
+    if (externalValue !== undefined) {
+      setInternalValue(externalValue);
+    }
+  }, [externalValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
+    const newValue = e.target.value;
+    
+    // Update internal state
+    setInternalValue(newValue);
+    
+    // Call external onChange if provided
+    if (externalOnChange) {
+      externalOnChange(e);
+    }
   };
 
   const handleClear = () => {
-    setValue('');
+    // Update internal state
+    setInternalValue('');
+    
+    // Call external onChange if provided with a synthetic event
+    if (externalOnChange) {
+      const syntheticEvent = {
+        target: { value: '' }
+      } as React.ChangeEvent<HTMLInputElement>;
+      externalOnChange(syntheticEvent);
+    }
+    
+    // Call onSearch with empty string
     if (onSearch) onSearch('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearch) onSearch(value);
+    if (onSearch) onSearch(externalValue !== undefined ? externalValue : internalValue);
   };
+
+  const currentValue = externalValue !== undefined ? externalValue : internalValue;
 
   return (
     <form 
@@ -47,7 +79,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       
       <input
         type="text"
-        value={value}
+        value={currentValue}
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
@@ -62,7 +94,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         {...props}
       />
       
-      {value && (
+      {currentValue && (
         <button 
           type="button" 
           onClick={handleClear}
