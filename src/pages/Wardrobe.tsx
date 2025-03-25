@@ -9,7 +9,7 @@ import {
   PlusCircle, 
   Filter, 
   ShirtIcon,
-  Pants, 
+  PantsIcon, 
   Footprints,
   Glasses,
   ChevronDown,
@@ -64,20 +64,17 @@ const Wardrobe = () => {
   const [fadeIn, setFadeIn] = useState(false);
   const queryClient = useQueryClient();
   
-  // Get or create wardrobe
   const wardrobeQuery = useQuery({
     queryKey: ['wardrobe'],
     queryFn: getOrCreateWardrobe
   });
   
-  // Get clothing items
   const itemsQuery = useQuery({
     queryKey: ['wardrobeItems', wardrobeQuery.data?.id],
     queryFn: () => getClothingItems(wardrobeQuery.data?.id || ''),
     enabled: !!wardrobeQuery.data?.id
   });
   
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => deleteClothingItem(itemId),
     onSuccess: () => {
@@ -103,7 +100,6 @@ const Wardrobe = () => {
     return () => clearTimeout(timer);
   }, []);
   
-  // Filter items by category
   const filteredItems = React.useMemo(() => {
     if (!itemsQuery.data) return [];
     
@@ -112,7 +108,6 @@ const Wardrobe = () => {
       : itemsQuery.data.filter(item => item.type === activeCategory);
   }, [itemsQuery.data, activeCategory]);
   
-  // Transform database items to wardrobe items
   const wardrobeItems = React.useMemo(() => {
     return filteredItems.map((item: ClothingItem) => ({
       id: item.id,
@@ -123,7 +118,6 @@ const Wardrobe = () => {
     }));
   }, [filteredItems]);
   
-  // Count items by category
   const countByCategory = React.useMemo(() => {
     if (!itemsQuery.data) return { All: 0, Tops: 0, Bottoms: 0, Outerwear: 0, Footwear: 0, Accessories: 0 };
     
@@ -152,7 +146,7 @@ const Wardrobe = () => {
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
     { icon: ShirtIcon, label: 'Tops', count: countByCategory.Tops },
-    { icon: Pants, label: 'Bottoms', count: countByCategory.Bottoms },
+    { icon: PantsIcon, label: 'Bottoms', count: countByCategory.Bottoms },
     { icon: ShirtIcon, label: 'Outerwear', count: countByCategory.Outerwear },
     { icon: Footprints, label: 'Footwear', count: countByCategory.Footwear },
     { icon: Glasses, label: 'Accessories', count: countByCategory.Accessories },
@@ -207,7 +201,6 @@ const Wardrobe = () => {
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-8 pb-8">
-              {/* Category Sidebar */}
               <div className="w-full lg:w-64 animate-fade-in" style={{ animationDelay: '100ms' }}>
                 <div className="bg-muted/30 rounded-xl p-4 lg:sticky lg:top-28">
                   <h2 className="font-semibold mb-3">Categories</h2>
@@ -226,7 +219,6 @@ const Wardrobe = () => {
                 </div>
               </div>
               
-              {/* Main Content */}
               <div className="flex-1 animate-fade-in" style={{ animationDelay: '200ms' }}>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">
@@ -276,7 +268,6 @@ const Wardrobe = () => {
         </div>
       </main>
       
-      {/* Add Item Modal */}
       {isAddingItem && wardrobeQuery.data && (
         <AddItemModal 
           isOpen={isAddingItem} 
