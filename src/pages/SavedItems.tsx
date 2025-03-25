@@ -7,87 +7,59 @@ import {
   Trash2, 
   ExternalLink, 
   Filter,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Sample data
-const savedItems = [
-  {
-    id: '1',
-    title: 'Vintage Levi\'s 501 Jeans',
-    image: 'https://images.unsplash.com/photo-1604176424472-17cd740f74e9?q=80&w=2080&auto=format&fit=crop',
-    price: '$65',
-    platform: 'Depop',
-    size: 'W32',
-    condition: 'Excellent',
-    dateAdded: '2023-10-15'
-  },
-  {
-    id: '2',
-    title: 'Retro Nike Windbreaker Jacket',
-    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=1972&auto=format&fit=crop',
-    price: '$48',
-    platform: 'ThredUp',
-    size: 'M',
-    condition: 'Good',
-    dateAdded: '2023-10-18'
-  },
-  {
-    id: '3',
-    title: 'Y2K Graphic Baby Tee',
-    image: 'https://images.unsplash.com/photo-1562157873-818bc0726f68?q=80&w=2127&auto=format&fit=crop',
-    price: '$32',
-    platform: 'eBay',
-    size: 'S',
-    condition: 'New',
-    dateAdded: '2023-10-20'
-  },
-  {
-    id: '4',
-    title: 'Vintage High Waist Pleated Trousers',
-    image: 'https://images.unsplash.com/photo-1584370848010-d7fe6bc767ec?q=80&w=1974&auto=format&fit=crop',
-    price: '$38',
-    platform: 'Poshmark',
-    size: 'W28',
-    condition: 'Good',
-    dateAdded: '2023-10-22'
-  },
-  {
-    id: '5',
-    title: 'Vintage Silk Scarf Printed',
-    image: 'https://images.unsplash.com/photo-1608744882201-52a7f7f3dd60?q=80&w=1974&auto=format&fit=crop',
-    price: '$18',
-    platform: 'Etsy',
-    condition: 'Excellent',
-    dateAdded: '2023-10-25'
-  },
-  {
-    id: '6',
-    title: '90s Chunky Platform Boots',
-    image: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?q=80&w=1974&auto=format&fit=crop',
-    price: '$85',
-    platform: 'Grailed',
-    size: 'US 8',
-    condition: 'Good',
-    dateAdded: '2023-10-28'
-  },
-];
+import { getUserSavedItems, saveItemForUser } from '@/services/listingService';
+import { useAuth } from '@/hooks/useAuth';
 
 const SavedItems = () => {
-  const [items, setItems] = useState(savedItems);
+  const { user } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [fadeIn, setFadeIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const timer = setTimeout(() => {
       setFadeIn(true);
     }, 300);
     
+    // Load saved items
+    loadSavedItems();
+    
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
+  
+  const loadSavedItems = async () => {
+    setIsLoading(true);
+    try {
+      if (user) {
+        const savedItems = await getUserSavedItems();
+        
+        // Format items for display
+        const formattedItems = savedItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          image: item.image,
+          price: `${item.currency} ${item.price}`,
+          platform: item.platform,
+          size: '', // Size not stored in listings table
+          condition: item.condition,
+          dateAdded: new Date().toISOString().split('T')[0] // Placeholder
+        }));
+        
+        setItems(formattedItems);
+      }
+    } catch (error) {
+      console.error('Error loading saved items:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const toggleSelectItem = (id: string) => {
     if (selectedItems.includes(id)) {
@@ -105,13 +77,22 @@ const SavedItems = () => {
     }
   };
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    // Unsave all selected items
+    for (const id of selectedItems) {
+      await saveItemForUser(id); // This toggles the saved status
+    }
+    
+    // Update the UI
     setItems(items.filter(item => !selectedItems.includes(item.id)));
     setSelectedItems([]);
     setIsSelecting(false);
   };
   
-  const removeItem = (id: string) => {
+  const removeItem = async (id: string) => {
+    // Unsave the item
+    await saveItemForUser(id);
+    // Update the UI
     setItems(items.filter(item => item.id !== id));
   };
 
@@ -230,7 +211,7 @@ const SavedItems = () => {
           )}
           
           {/* Select All Option */}
-          {isSelecting && (
+          {isSelecting && items.length > 0 && (
             <div className="flex items-center mb-4 animate-fade-in">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input 
@@ -245,7 +226,14 @@ const SavedItems = () => {
           )}
           
           {/* Saved Items Section */}
-          {items.length > 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Loading your saved items...</p>
+              </div>
+            </div>
+          ) : items.length > 0 ? (
             <div className="mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-muted-foreground">
@@ -306,6 +294,7 @@ const SavedItems = () => {
                         variant="ghost" 
                         size="sm" 
                         className="text-xs h-8 px-2 gap-1"
+                        onClick={() => window.open(`https://${item.platform.toLowerCase()}.com`, '_blank')}
                       >
                         <ExternalLink className="h-3 w-3" />
                         <span>View on {item.platform}</span>
@@ -321,7 +310,7 @@ const SavedItems = () => {
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 Items you save while browsing thrift finds will appear here for easy access.
               </p>
-              <Button>
+              <Button onClick={() => window.location.href = "/search"}>
                 Browse Thrift Finds
               </Button>
             </div>

@@ -53,39 +53,6 @@ export type Database = {
           },
         ]
       }
-      liked_items: {
-        Row: {
-          liked_at: string | null
-          listing_id: string
-          user_id: string
-        }
-        Insert: {
-          liked_at?: string | null
-          listing_id: string
-          user_id: string
-        }
-        Update: {
-          liked_at?: string | null
-          listing_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "liked_items_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "liked_items_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       listings: {
         Row: {
           condition: string
@@ -93,7 +60,7 @@ export type Database = {
           id: string
           image: string
           last_updated: string | null
-          platform: Database["public"]["Enums"]["platform_enum"]
+          platform: string
           price: number
           seller_feedback_percentage: string
           seller_feedback_score: number | null
@@ -107,7 +74,7 @@ export type Database = {
           id: string
           image: string
           last_updated?: string | null
-          platform: Database["public"]["Enums"]["platform_enum"]
+          platform: string
           price: number
           seller_feedback_percentage: string
           seller_feedback_score?: number | null
@@ -121,7 +88,7 @@ export type Database = {
           id?: string
           image?: string
           last_updated?: string | null
-          platform?: Database["public"]["Enums"]["platform_enum"]
+          platform?: string
           price?: number
           seller_feedback_percentage?: string
           seller_feedback_score?: number | null

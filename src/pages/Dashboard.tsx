@@ -7,87 +7,30 @@ import {
   Grid3x3, 
   Heart, 
   ArrowUpRight, 
-  Bell, 
   TrendingUp,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Button } from '@/components/ui/button';
 import { ItemCard } from '@/components/ui/ItemCard';
+import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
 import { cn } from '@/lib/utils';
+import { getUserSavedItems, getRecommendedItems, saveItemForUser } from '@/services/listingService';
+import { useAuth } from '@/hooks/useAuth';
 
-// Sample data
-const recentSearches = ["vintage denim jacket", "y2k tops", "leather boots size 9"];
-
-const savedItems = [
-  {
-    id: '1',
-    title: 'Vintage Levi\'s Denim Jacket',
-    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=1972&auto=format&fit=crop',
-    price: '$78',
-    platform: 'eBay',
-    condition: 'Good'
-  },
-  {
-    id: '2',
-    title: 'Retro Graphic Tee',
-    image: 'https://images.unsplash.com/photo-1562157873-818bc0726f68?q=80&w=2127&auto=format&fit=crop',
-    price: '$25',
-    platform: 'Depop',
-    condition: 'Excellent'
-  },
-  {
-    id: '3',
-    title: 'Wool Oversized Blazer',
-    image: 'https://images.unsplash.com/photo-1608744882201-52a7f7f3dd60?q=80&w=1974&auto=format&fit=crop',
-    price: '$65',
-    platform: 'ThredUp',
-    condition: 'Like New'
-  },
-];
-
-const recommendations = [
-  {
-    id: '4',
-    title: 'Platform Doc Martens',
-    image: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?q=80&w=1974&auto=format&fit=crop',
-    price: '$120',
-    platform: 'Poshmark',
-    condition: 'Good'
-  },
-  {
-    id: '5',
-    title: 'Vintage Silk Scarf',
-    image: 'https://images.unsplash.com/photo-1584370848010-d7fe6bc767ec?q=80&w=1974&auto=format&fit=crop',
-    price: '$18',
-    platform: 'Etsy',
-    condition: 'Excellent'
-  },
-  {
-    id: '6',
-    title: 'High-Waisted Mom Jeans',
-    image: 'https://images.unsplash.com/photo-1577900234203-28f3962ef521?q=80&w=1974&auto=format&fit=crop',
-    price: '$45',
-    platform: 'Depop',
-    condition: 'Good'
-  },
-  {
-    id: '7',
-    title: 'Chunky Knit Sweater',
-    image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?q=80&w=2072&auto=format&fit=crop',
-    price: '$37',
-    platform: 'ThredUp',
-    condition: 'Like New'
-  },
-];
-
+// Sample data for trending searches 
 const trendingSearches = ["baggy cargo pants", "chunky loafers", "oversized cardigan", "90s sunglasses"];
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [greeting, setGreeting] = useState('Good day');
   const [animateCards, setAnimateCards] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [savedItems, setSavedItems] = useState<any[]>([]);
 
   useEffect(() => {
     // Set greeting based on time of day
@@ -101,12 +44,54 @@ const Dashboard = () => {
       setAnimateCards(true);
     }, 300);
 
+    // Load the user's recent searches (placeholder for now)
+    setRecentSearches(["vintage denim jacket", "y2k tops", "leather boots size 9"]);
+
+    // Load the user's saved items
+    if (user) {
+      loadSavedItems();
+    }
+
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
+
+  const loadSavedItems = async () => {
+    setIsLoadingSaved(true);
+    try {
+      const items = await getUserSavedItems(3); // Get most recent 3 saved items
+      
+      // Format the items for display
+      const formattedItems = items.map(item => ({
+        id: item.id,
+        title: item.title,
+        image: item.image,
+        price: `${item.currency} ${item.price}`,
+        platform: item.platform,
+        condition: item.condition
+      }));
+      
+      setSavedItems(formattedItems);
+    } catch (error) {
+      console.error('Error loading saved items:', error);
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
 
   const handleSearch = (query: string) => {
     console.log('Searching for:', query);
     // This would navigate to search page with the query
+    window.location.href = `/search?q=${encodeURIComponent(query)}`;
+  };
+
+  const handleSaveItem = async (id: string, isSaved: boolean) => {
+    if (!isSaved) {
+      // Remove the item from the savedItems array
+      setSavedItems(prev => prev.filter(item => item.id !== id));
+    } else {
+      // Refresh the saved items list
+      loadSavedItems();
+    }
   };
 
   return (
@@ -118,7 +103,7 @@ const Dashboard = () => {
           {/* Header Section */}
           <div className="mb-10 animate-fade-in">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">
-              {greeting}, <span className="text-primary">Thrifter</span>
+              {greeting}, <span className="text-primary">{user?.user_metadata?.name || 'Thrifter'}</span>
             </h1>
             <p className="text-muted-foreground text-lg">
               Let's help you discover your perfect sustainable style today.
@@ -209,27 +194,45 @@ const Dashboard = () => {
           </div>
           
           {/* Saved Items Section */}
-          {savedItems.length > 0 && (
-            <section className={cn(
-              "mb-12",
-              animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
-              "transition-all duration-500"
-            )} style={{ transitionDelay: '350ms' }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Recently Saved</h2>
-                <Link to="/saved" className="text-primary flex items-center gap-1 text-sm hover:underline">
-                  <span>View all</span>
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
+          <section className={cn(
+            "mb-12",
+            animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+            "transition-all duration-500"
+          )} style={{ transitionDelay: '350ms' }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Recently Saved</h2>
+              <Link to="/saved" className="text-primary flex items-center gap-1 text-sm hover:underline">
+                <span>View all</span>
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
+            
+            {isLoadingSaved ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
               </div>
-              
+            ) : savedItems.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {savedItems.map(item => (
-                  <ItemCard key={item.id} item={item} saved={true} />
+                  <ItemCard 
+                    key={item.id} 
+                    item={item} 
+                    saved={true} 
+                    onSave={handleSaveItem} 
+                  />
                 ))}
               </div>
-            </section>
-          )}
+            ) : (
+              <div className="bg-muted/40 rounded-lg p-6 text-center">
+                <p className="text-muted-foreground">
+                  You haven't saved any items yet. Start exploring to find thrift treasures!
+                </p>
+                <Button className="mt-4" onClick={() => window.location.href = "/search"}>
+                  Explore Listings
+                </Button>
+              </div>
+            )}
+          </section>
           
           {/* Recommendations Section */}
           <section className={cn(
@@ -237,24 +240,13 @@ const Dashboard = () => {
             animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
             "transition-all duration-500"
           )} style={{ transitionDelay: '400ms' }}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold">Recommended For You</h2>
-                <div className="bg-primary/10 px-2 py-1 rounded-full flex items-center gap-1">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-medium text-primary">AI-powered</span>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" className="text-sm">
-                Refresh
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {recommendations.map(item => (
-                <ItemCard key={item.id} item={item} />
-              ))}
-            </div>
+            <RecommendationCarousel
+              title="Recommended For You"
+              description="Items we think you'll love based on your style"
+              fetchItems={() => getRecommendedItems(4)}
+              onSaveItem={handleSaveItem}
+              emptyMessage="We're still learning your style preferences. Continue exploring to get personalized recommendations!"
+            />
           </section>
           
           {/* Trending Searches */}
