@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { saveItemForUser, isItemSaved } from '@/services/listingService';
 
 interface ItemCardProps {
   item: {
@@ -14,7 +15,7 @@ interface ItemCardProps {
     condition?: string;
   };
   className?: string;
-  onSave?: (id: string) => void;
+  onSave?: (id: string, isSaved: boolean) => void;
   saved?: boolean;
 }
 
@@ -22,17 +23,30 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   item,
   className,
   onSave,
-  saved = false,
+  saved: initialSaved = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [isSaved, setIsSaved] = useState(saved);
+  const [isSaved, setIsSaved] = useState(initialSaved);
   const [imageLoaded, setImageLoaded] = useState(false);
   
-  const handleSave = (e: React.MouseEvent) => {
+  // Check if the item is saved when component mounts
+  useEffect(() => {
+    const checkSavedStatus = async () => {
+      const savedStatus = await isItemSaved(item.id);
+      setIsSaved(savedStatus);
+    };
+    
+    checkSavedStatus();
+  }, [item.id]);
+  
+  const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsSaved(!isSaved);
-    if (onSave) onSave(item.id);
+    
+    const newSavedStatus = await saveItemForUser(item.id);
+    setIsSaved(newSavedStatus);
+    
+    if (onSave) onSave(item.id, newSavedStatus);
   };
 
   return (

@@ -164,6 +164,35 @@ export type Database = {
           },
         ]
       }
+      user_searches: {
+        Row: {
+          created_at: string | null
+          id: string
+          query: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          query: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          query?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_searches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_style_preferences: {
         Row: {
           price_range: Json | null

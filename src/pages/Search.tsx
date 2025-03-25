@@ -17,105 +17,24 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { 
+  saveListing, 
+  getPopularItems, 
+  getRecommendedItems 
+} from '@/services/listingService';
 
-const popularItems = [
-  {
-    id: 'p1',
-    title: 'Y2K Platform Sandals',
-    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1976&auto=format&fit=crop',
-    price: '$55',
-    platform: 'Depop',
-    size: 'US 8',
-    condition: 'Good'
-  },
-  {
-    id: 'p2',
-    title: 'Oversized Knit Sweater',
-    image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=1964&auto=format&fit=crop',
-    price: '$42',
-    platform: 'ThredUp',
-    size: 'One Size',
-    condition: 'Excellent'
-  },
-  {
-    id: 'p3',
-    title: 'Retro Graphic T-shirt',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop',
-    price: '$28',
-    platform: 'Etsy',
-    size: 'M',
-    condition: 'Vintage'
-  },
-  {
-    id: 'p4',
-    title: 'High Waist Mom Jeans',
-    image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=1974&auto=format&fit=crop',
-    price: '$58',
-    platform: 'Poshmark',
-    size: 'W30',
-    condition: 'Good'
-  },
-  {
-    id: 'p5',
-    title: 'Mini Leather Backpack',
-    image: 'https://images.unsplash.com/photo-1575844611406-0e769eb77fbe?q=80&w=2070&auto=format&fit=crop',
-    price: '$65',
-    platform: 'eBay',
-    condition: 'New'
-  },
-];
-
-const recommendedItems = [
-  {
-    id: 'r1',
-    title: 'Vintage Denim Jacket',
-    image: 'https://images.unsplash.com/photo-1601333144130-8cbb312386b6?q=80&w=1974&auto=format&fit=crop',
-    price: '$78',
-    platform: 'Depop',
-    size: 'M',
-    condition: 'Good'
-  },
-  {
-    id: 'r2',
-    title: 'Checkered Wool Blazer',
-    image: 'https://images.unsplash.com/photo-1578932750294-f5075e85f44a?q=80&w=1974&auto=format&fit=crop',
-    price: '$95',
-    platform: 'Etsy',
-    size: 'L',
-    condition: 'Excellent'
-  },
-  {
-    id: 'r3',
-    title: 'Floral Summer Dress',
-    image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=1946&auto=format&fit=crop',
-    price: '$45',
-    platform: 'Poshmark',
-    size: 'S',
-    condition: 'Like New'
-  },
-  {
-    id: 'r4',
-    title: 'Leather Messenger Bag',
-    image: 'https://images.unsplash.com/photo-1548863227-3af567fc3b27?q=80&w=1974&auto=format&fit=crop',
-    price: '$120',
-    platform: 'eBay',
-    condition: 'Vintage'
-  },
-  {
-    id: 'r5',
-    title: 'Classic Wool Overcoat',
-    image: 'https://images.unsplash.com/photo-1539533113208-f6df8cc8b543?q=80&w=1974&auto=format&fit=crop',
-    price: '$150',
-    platform: 'ThredUp',
-    size: 'XL',
-    condition: 'Good'
-  },
-];
-
-const platforms = ["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"];
-const categories = ["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"];
-const conditions = ["Any Condition", "New", "Like New", "Good", "Fair"];
-const priceRanges = ["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"];
+// Convert a database listing to a display item
+const formatListingForDisplay = (listing: any) => ({
+  id: listing.id,
+  title: listing.title,
+  price: `$${listing.price}`,
+  image: listing.image,
+  platform: listing.platform,
+  condition: listing.condition,
+  seller_username: listing.seller_username,
+  size: '',
+  url: listing.url
+});
 
 const Search = () => {
   const { session } = useAuth();
@@ -130,6 +49,10 @@ const Search = () => {
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
+  const [isLoadingPopular, setIsLoadingPopular] = useState(false);
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([]);
+  const [popularItems, setPopularItems] = useState<any[]>([]);
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -137,6 +60,31 @@ const Search = () => {
     }, 300);
     
     return () => clearTimeout(timer);
+  }, []);
+  
+  // Load popular and recommended items
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoadingRecommended(true);
+      setIsLoadingPopular(true);
+      
+      try {
+        // Get recommended items
+        const recommended = await getRecommendedItems(5);
+        setRecommendedItems(recommended.map(formatListingForDisplay));
+        
+        // Get popular items
+        const popular = await getPopularItems(5);
+        setPopularItems(popular.map(formatListingForDisplay));
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoadingRecommended(false);
+        setIsLoadingPopular(false);
+      }
+    };
+    
+    loadInitialData();
   }, []);
   
   const handleSearch = async (query: string) => {
@@ -152,6 +100,13 @@ const Search = () => {
     
     try {
       const userGender = session?.user?.user_metadata?.gender || 'unspecified';
+      
+      // Save the search query for the user if logged in
+      if (session?.user) {
+        await supabase
+          .from('user_searches')
+          .insert({ user_id: session.user.id, query });
+      }
       
       const { data, error } = await supabase.functions.invoke('thrift-search', {
         body: { userQuery: query, userGender }
@@ -194,17 +149,27 @@ const Search = () => {
       }
       
       if (data.items && Array.isArray(data.items)) {
-        const transformedItems = data.items.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          price: `$${item.price}`,
-          image: item.image,
-          platform: item.platform,
-          condition: item.condition,
-          seller_username: item.seller_username,
-          size: '',
-          url: item.url
-        }));
+        const transformedItems = data.items.map((item: any) => {
+          // Save the listing to the database
+          const dbItem = {
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            currency: item.currency,
+            image: item.image,
+            platform: item.platform,
+            seller_username: item.seller_username || 'Unknown Seller',
+            seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+            seller_feedback_score: item.seller_feedback_score || 0,
+            condition: item.condition || 'Not specified',
+            url: item.url || ''
+          };
+          
+          // Save to database without waiting (fire and forget)
+          saveListing(dbItem);
+          
+          return formatListingForDisplay(dbItem);
+        });
         
         setResults(transformedItems);
         setHasMoreResults(data.items.length >= 10);
@@ -237,52 +202,10 @@ const Search = () => {
     setActiveFilters([]);
   };
   
-  const saveItem = async (id: string) => {
-    if (!session) {
-      toast('Please login to save items', {
-        description: 'Create an account to save items to your collection',
-        action: {
-          label: 'Login',
-          onClick: () => window.location.href = '/auth'
-        }
-      });
-      return;
-    }
-    
-    try {
-      const item = results.find(item => item.id === id);
-      if (!item) return;
-      
-      const dbItem = {
-        id: item.id,
-        title: item.title,
-        price: parseFloat(item.price.replace('$', '')),
-        currency: 'USD',
-        image: item.image,
-        platform: 'ebay',
-        seller_username: item.seller_username || 'Unknown Seller',
-        seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
-        seller_feedback_score: item.seller_feedback_score || 0,
-        condition: item.condition || 'Not specified',
-        url: item.url || ''
-      };
-      
-      const { data, error } = await supabase.functions.invoke('save-listing', {
-        body: { 
-          item: dbItem,
-          userId: session.user.id
-        }
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast.success('Item saved to your collection');
-    } catch (error) {
-      console.error('Error saving item:', error);
-      toast.error('Failed to save item');
-    }
+  const handleSaveItem = async (id: string, isSaved: boolean) => {
+    // Note: The actual saving is now handled in the ItemCard component
+    // This function is for any additional UI updates after saving
+    console.log(`Item ${id} is now ${isSaved ? 'saved' : 'unsaved'}`);
   };
 
   const loadMoreResults = () => {
@@ -370,20 +293,23 @@ const Search = () => {
                 title="Recommended For You"
                 description="Based on your style preferences and past saves"
                 items={recommendedItems}
-                onSaveItem={saveItem}
+                onSaveItem={handleSaveItem}
+                isLoading={isLoadingRecommended}
+                emptyMessage="Start saving items to get personalized recommendations!"
               />
               
               <RecommendationCarousel
                 title="Popular Right Now"
                 description="Trending items that match your style"
                 items={popularItems}
-                onSaveItem={saveItem}
+                onSaveItem={handleSaveItem}
+                isLoading={isLoadingPopular}
+                emptyMessage="No popular items to show yet. Check back soon!"
               />
             </div>
           )}
           
-          {(showSearchResults || activeFilters.length > 0) && (
-            <div className="mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
+          <div className="mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
               <div className="flex items-center justify-between mb-4">
                 <Button 
                   variant="outline" 
@@ -433,7 +359,7 @@ const Search = () => {
                   <div>
                     <h3 className="font-medium mb-2 text-sm">Platform</h3>
                     <div className="space-y-1">
-                      {platforms.map(platform => (
+                      {["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"].map(platform => (
                         <button 
                           key={platform}
                           onClick={() => toggleFilter(platform)}
@@ -453,7 +379,7 @@ const Search = () => {
                   <div>
                     <h3 className="font-medium mb-2 text-sm">Category</h3>
                     <div className="space-y-1">
-                      {categories.map(category => (
+                      {["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"].map(category => (
                         <button 
                           key={category}
                           onClick={() => toggleFilter(category)}
@@ -473,7 +399,7 @@ const Search = () => {
                   <div>
                     <h3 className="font-medium mb-2 text-sm">Condition</h3>
                     <div className="space-y-1">
-                      {conditions.map(condition => (
+                      {["Any Condition", "New", "Like New", "Good", "Fair"].map(condition => (
                         <button 
                           key={condition}
                           onClick={() => toggleFilter(condition)}
@@ -493,7 +419,7 @@ const Search = () => {
                   <div>
                     <h3 className="font-medium mb-2 text-sm">Price Range</h3>
                     <div className="space-y-1">
-                      {priceRanges.map(range => (
+                      {["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"].map(range => (
                         <button 
                           key={range}
                           onClick={() => toggleFilter(range)}
@@ -512,7 +438,6 @@ const Search = () => {
                 </div>
               )}
             </div>
-          )}
           
           {showSearchResults && !isSearching && !isLoadingResults && (
             <>
@@ -551,7 +476,7 @@ const Search = () => {
                         {viewMode === 'grid' ? (
                           <ItemCard 
                             item={item} 
-                            onSave={() => saveItem(item.id)}
+                            onSave={handleSaveItem}
                           />
                         ) : (
                           <div className="flex gap-4 p-4 border border-border rounded-lg">
@@ -568,7 +493,7 @@ const Search = () => {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              onClick={() => saveItem(item.id)}
+                              onClick={() => handleSaveItem(item.id, true)}
                               className="h-10 px-3"
                             >
                               Save
