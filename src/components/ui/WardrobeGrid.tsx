@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, TagIcon } from 'lucide-react';
+import { Plus, TagIcon, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WardrobeItem {
@@ -14,12 +14,14 @@ interface WardrobeItem {
 interface WardrobeGridProps {
   items: WardrobeItem[];
   onAddItem?: () => void;
+  onDeleteItem?: (id: string) => void;
   className?: string;
 }
 
 export const WardrobeGrid: React.FC<WardrobeGridProps> = ({
   items,
   onAddItem,
+  onDeleteItem,
   className,
 }) => {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -80,6 +82,18 @@ export const WardrobeGrid: React.FC<WardrobeGridProps> = ({
                 </span>
               ))}
             </div>
+            
+            {onDeleteItem && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteItem(item.id);
+                }}
+                className="absolute top-2 right-2 p-1.5 bg-black/30 hover:bg-red-500/80 rounded-full transition-colors"
+              >
+                <Trash2 className="h-4 w-4 text-white" />
+              </button>
+            )}
           </div>
         </div>
       ))}
