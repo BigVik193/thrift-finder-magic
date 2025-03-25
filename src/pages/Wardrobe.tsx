@@ -4,10 +4,12 @@ import { Navbar } from '@/components/layout/Navbar';
 import { WardrobeGrid } from '@/components/ui/WardrobeGrid';
 import { Button } from '@/components/ui/button';
 import { AddItemModal } from '@/components/wardrobe/AddItemModal';
+import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
 import { useAuth } from '@/hooks/useAuth';
 import { 
   PlusCircle, 
   Filter, 
+  Shirt,
   ShirtIcon,
   Footprints,
   Glasses,
@@ -55,6 +57,44 @@ const CategoryTab: React.FC<CategoryTabProps> = ({
     </button>
   );
 };
+
+const recommendedItems = [
+  {
+    id: 'r1',
+    title: 'Vintage Denim Jacket',
+    image: 'https://images.unsplash.com/photo-1601333144130-8cbb312386b6?q=80&w=1974&auto=format&fit=crop',
+    price: '$78',
+    platform: 'Depop',
+    size: 'M',
+    condition: 'Good'
+  },
+  {
+    id: 'r2',
+    title: 'Checkered Wool Blazer',
+    image: 'https://images.unsplash.com/photo-1578932750294-f5075e85f44a?q=80&w=1974&auto=format&fit=crop',
+    price: '$95',
+    platform: 'Etsy',
+    size: 'L',
+    condition: 'Excellent'
+  },
+  {
+    id: 'r3',
+    title: 'Floral Summer Dress',
+    image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=1946&auto=format&fit=crop',
+    price: '$45',
+    platform: 'Poshmark',
+    size: 'S',
+    condition: 'Like New'
+  },
+  {
+    id: 'r4',
+    title: 'Leather Messenger Bag',
+    image: 'https://images.unsplash.com/photo-1548863227-3af567fc3b27?q=80&w=1974&auto=format&fit=crop',
+    price: '$120',
+    platform: 'eBay',
+    condition: 'Vintage'
+  },
+];
 
 const Wardrobe = () => {
   const { user, signOut } = useAuth();
@@ -141,10 +181,16 @@ const Wardrobe = () => {
   const handleAddItem = () => {
     setIsAddingItem(true);
   };
+
+  const saveRecommendedItem = (id: string) => {
+    console.log("Saving recommended item:", id);
+    // In a real app, this would save to user's favorites
+    toast.success('Item saved to favorites');
+  };
   
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
-    { icon: ShirtIcon, label: 'Tops', count: countByCategory.Tops },
+    { icon: Shirt, label: 'Tops', count: countByCategory.Tops },
     { icon: ShirtIcon, label: 'Bottoms', count: countByCategory.Bottoms },
     { icon: ShirtIcon, label: 'Outerwear', count: countByCategory.Outerwear },
     { icon: Footprints, label: 'Footwear', count: countByCategory.Footwear },
@@ -259,6 +305,18 @@ const Wardrobe = () => {
                     <Button onClick={handleAddItem}>
                       Add Your First Item
                     </Button>
+                  </div>
+                )}
+                
+                {/* Recommendation Carousel */}
+                {filteredItems.length > 0 && (
+                  <div className="mt-16">
+                    <RecommendationCarousel
+                      title="Recommended For Your Wardrobe"
+                      description="Items that would complement your current wardrobe"
+                      items={recommendedItems}
+                      onSaveItem={saveRecommendedItem}
+                    />
                   </div>
                 )}
               </div>
