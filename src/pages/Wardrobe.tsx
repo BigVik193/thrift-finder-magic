@@ -10,7 +10,7 @@ import {
   PlusCircle, 
   Filter, 
   ShirtIcon,
-  TrousersIcon, 
+  PantsIcon, 
   Footprints,
   Glasses,
   ChevronDown,

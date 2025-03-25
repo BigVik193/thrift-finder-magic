@@ -1,4 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 
 export interface ClothingItem {
   id: string;
@@ -28,7 +30,14 @@ export const getOrCreateWardrobe = async (): Promise<Wardrobe> => {
   
   // If wardrobe exists, return it
   if (existingWardrobes && existingWardrobes.length > 0) {
-    return existingWardrobes[0];
+    const wardrobe = existingWardrobes[0];
+    // Ensure style_aggregate is correctly typed
+    return {
+      id: wardrobe.id,
+      user_id: wardrobe.user_id,
+      created_at: wardrobe.created_at,
+      style_aggregate: wardrobe.style_aggregate as Record<string, number> || {}
+    };
   }
   
   // Otherwise create a new wardrobe
@@ -47,7 +56,13 @@ export const getOrCreateWardrobe = async (): Promise<Wardrobe> => {
     
   if (insertError) throw insertError;
   
-  return newWardrobe;
+  // Ensure style_aggregate is correctly typed
+  return {
+    id: newWardrobe.id,
+    user_id: newWardrobe.user_id,
+    created_at: newWardrobe.created_at,
+    style_aggregate: newWardrobe.style_aggregate as Record<string, number> || {}
+  };
 };
 
 export const getClothingItems = async (wardrobeId: string): Promise<ClothingItem[]> => {
@@ -58,7 +73,16 @@ export const getClothingItems = async (wardrobeId: string): Promise<ClothingItem
     
   if (error) throw error;
   
-  return data || [];
+  // Ensure style_matches is correctly typed
+  return data?.map(item => ({
+    id: item.id,
+    type: item.type,
+    color: item.color,
+    material: item.material,
+    image_url: item.image_url,
+    created_at: item.created_at,
+    style_matches: item.style_matches as Record<string, boolean> || {}
+  })) || [];
 };
 
 export const deleteClothingItem = async (itemId: string): Promise<void> => {
