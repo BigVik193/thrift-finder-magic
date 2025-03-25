@@ -1,7 +1,11 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   User, 
   CreditCard, 
@@ -13,32 +17,198 @@ import {
   Edit, 
   Upload,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { 
+  getUserProfile, 
+  getUserStylePreferences, 
+  getRecentActivity,
+  updateStylePreferences,
+  signOutUser,
+  StyleScore,
+  UserProfile,
+  StylePreference,
+  RecentActivity
+} from '@/services/profileService';
+
+// List of all style categories
+const STYLE_CATEGORIES = [
+  'Streetwear',
+  'Minimalist',
+  'Vintage',
+  'Athleisure',
+  'Skater',
+  'Y2K',
+  'Workwear',
+  'Bohemian',
+  'Business Casual',
+  'Classic Preppy',
+  'Formalwear',
+  'Smart Casual',
+  'Goth/Techwear',
+  'Punk/Grunge',
+  'Rockstar/Edgy',
+  'Western/Cowboy',
+];
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('Profile');
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stylePreferences, setStylePreferences] = useState<StylePreference | null>(null);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [priceRange, setPriceRange] = useState<number>(100);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  
+  // Form states
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [sizes, setSizes] = useState({
+    tops: '',
+    bottoms: '',
+    shoes: '',
+    outerwear: ''
+  });
+  
+  useEffect(() => {
+    // Redirect if not logged in
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    
+    // Load user data
+    loadUserData();
+  }, [user, navigate]);
+  
+  const loadUserData = async () => {
+    setLoading(true);
+    try {
+      // Load profile data
+      const profileData = await getUserProfile();
+      setProfile(profileData);
+      
+      if (profileData) {
+        setName(profileData.name || '');
+      }
+      
+      // Load style preferences
+      const preferencesData = await getUserStylePreferences();
+      setStylePreferences(preferencesData);
+      
+      if (preferencesData) {
+        // Set selected styles (those with scores > 0)
+        const selected = Object.entries(preferencesData.style_scores || {})
+          .filter(([_, score]) => score > 0)
+          .map(([style]) => style);
+        setSelectedStyles(selected);
+        
+        // Set price range
+        if (preferencesData.price_range) {
+          setPriceRange(preferencesData.price_range.max);
+        }
+        
+        // Set sizes
+        if (preferencesData.sizes) {
+          setSizes({
+            tops: preferencesData.sizes.tops || '',
+            bottoms: preferencesData.sizes.bottoms || '',
+            shoes: preferencesData.sizes.shoes || '',
+            outerwear: preferencesData.sizes.outerwear || '',
+          });
+        }
+      }
+      
+      // Load recent activity
+      const activityData = await getRecentActivity();
+      setRecentActivity(activityData);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      toast.error('Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleSignOut = async () => {
+    await signOutUser();
+    navigate('/auth');
+  };
+  
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+    
+    toast.success('Profile updated successfully');
+    // Note: This is a placeholder - we would add profile update functionality here
+  };
+  
+  const handleSavePreferences = async () => {
+    if (!stylePreferences) return;
+    
+    // Create updated style scores object
+    const styleScores: StyleScore = {};
+    
+    // Set scores for selected styles to 1, others to 0
+    STYLE_CATEGORIES.forEach(style => {
+      styleScores[style] = selectedStyles.includes(style) ? 1 : 0;
+    });
+    
+    // Update preferences in database
+    const success = await updateStylePreferences({
+      style_scores: styleScores,
+      price_range: {
+        min: 0,
+        max: priceRange
+      },
+      sizes: {
+        tops: sizes.tops || null,
+        bottoms: sizes.bottoms || null,
+        shoes: sizes.shoes || null,
+        outerwear: sizes.outerwear || null
+      }
+    });
+    
+    if (success) {
+      // Refresh style preferences data
+      const updatedPrefs = await getUserStylePreferences();
+      setStylePreferences(updatedPrefs);
+    }
+  };
+  
+  const handleStyleSelect = (style: string) => {
+    setSelectedStyles(prev => 
+      prev.includes(style)
+        ? prev.filter(s => s !== style)
+        : [...prev, style]
+    );
+  };
+  
+  // Get top styles based on scores
+  const getTopStyles = () => {
+    if (!stylePreferences?.style_scores) return [];
+    
+    return Object.entries(stylePreferences.style_scores)
+      .filter(([_, score]) => score > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([style, score]) => ({
+        name: style,
+        percentage: Math.min(100, Math.max(0, score * 100))
+      }));
+  };
+  
+  const topStyles = getTopStyles();
   
   const tabs = [
     { name: 'Profile', icon: User },
     { name: 'Preferences', icon: Settings },
     { name: 'Subscription', icon: CreditCard },
     { name: 'Notifications', icon: Bell },
-  ];
-  
-  const stylePreferences = [
-    { name: 'Minimalist', percentage: 80 },
-    { name: 'Vintage', percentage: 65 },
-    { name: 'Streetwear', percentage: 45 },
-    { name: 'Bohemian', percentage: 20 },
-  ];
-  
-  const recentActivity = [
-    { type: 'saved', text: 'Saved "Vintage Levi\'s Denim Jacket"', time: '2 hours ago' },
-    { type: 'search', text: 'Searched for "oversized sweaters"', time: '1 day ago' },
-    { type: 'upload', text: 'Uploaded 3 outfit photos', time: '3 days ago' },
-    { type: 'saved', text: 'Saved "Y2K Platform Boots"', time: '1 week ago' },
   ];
 
   return (
@@ -54,17 +224,34 @@ const Profile = () => {
               <div className="glass-card p-6 mb-6 text-center">
                 <div className="relative inline-block mb-4">
                   <div className="w-24 h-24 bg-muted rounded-full overflow-hidden flex items-center justify-center">
-                    {/* Placeholder Avatar */}
-                    <User className="h-12 w-12 text-muted-foreground/50" />
+                    {profile?.profile_picture ? (
+                      <img 
+                        src={profile.profile_picture} 
+                        alt={profile.name}
+                        className="h-full w-full object-cover" 
+                      />
+                    ) : (
+                      <User className="h-12 w-12 text-muted-foreground/50" />
+                    )}
                   </div>
                   <button className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-sm">
                     <Edit className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 
-                <h2 className="text-xl font-bold mb-1">Thrift Enthusiast</h2>
+                <h2 className="text-xl font-bold mb-1">
+                  {loading ? (
+                    <div className="h-7 bg-muted animate-pulse rounded w-3/4 mx-auto"></div>
+                  ) : (
+                    profile?.name || "Thrift Enthusiast"
+                  )}
+                </h2>
                 <p className="text-muted-foreground text-sm mb-4">
-                  user@example.com
+                  {loading ? (
+                    <div className="h-5 bg-muted animate-pulse rounded w-1/2 mx-auto"></div>
+                  ) : (
+                    user?.email || "user@example.com"
+                  )}
                 </p>
                 
                 <div className="bg-muted/50 rounded-md py-2 px-3 flex items-center justify-center gap-2 mb-4">
@@ -74,7 +261,11 @@ const Profile = () => {
                   </Button>
                 </div>
                 
-                <Button variant="outline" className="w-full gap-2 text-muted-foreground">
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2 text-muted-foreground"
+                  onClick={handleSignOut}
+                >
                   <LogOut className="h-4 w-4" />
                   <span>Sign Out</span>
                 </Button>
@@ -104,7 +295,13 @@ const Profile = () => {
             
             {/* Main Content */}
             <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
-              {activeTab === 'Profile' && (
+              {loading && (
+                <div className="flex justify-center items-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              )}
+              
+              {!loading && activeTab === 'Profile' && (
                 <>
                   <h1 className="text-2xl font-bold mb-6">Your Profile</h1>
                   
@@ -118,22 +315,34 @@ const Profile = () => {
                       </Button>
                     </div>
                     
-                    <div className="space-y-4">
-                      {stylePreferences.map(style => (
-                        <div key={style.name}>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium">{style.name}</span>
-                            <span className="text-sm text-muted-foreground">{style.percentage}%</span>
+                    {topStyles.length > 0 ? (
+                      <div className="space-y-4">
+                        {topStyles.map(style => (
+                          <div key={style.name}>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">{style.name}</span>
+                              <span className="text-sm text-muted-foreground">{style.percentage}%</span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary" 
+                                style={{ width: `${style.percentage}%` }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary" 
-                              style={{ width: `${style.percentage}%` }}
-                            ></div>
-                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center">
+                        <div className="bg-muted/30 p-3 rounded-lg inline-block mb-3">
+                          <Search className="h-6 w-6 text-muted-foreground" />
                         </div>
-                      ))}
-                    </div>
+                        <h3 className="text-base font-medium mb-1">Still learning your style</h3>
+                        <p className="text-sm text-muted-foreground">
+                          We're still learning your style preferences. Keep engaging with items to help us get to know your tastes better!
+                        </p>
+                      </div>
+                    )}
                     
                     <div className="mt-6 pt-4 border-t border-border">
                       <div className="flex items-start gap-3">
@@ -154,25 +363,36 @@ const Profile = () => {
                   <div className="glass-card p-6 mb-6">
                     <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
                     
-                    <div className="space-y-3">
-                      {recentActivity.map((activity, index) => (
-                        <div 
-                          key={index}
-                          className="flex items-start gap-3 p-2 hover:bg-muted/50 rounded-lg transition-colors"
-                        >
-                          <div className="shrink-0 bg-secondary p-2 rounded-full">
-                            {activity.type === 'saved' && <Heart className="h-4 w-4 text-primary" />}
-                            {activity.type === 'search' && <User className="h-4 w-4 text-primary" />}
-                            {activity.type === 'upload' && <Upload className="h-4 w-4 text-primary" />}
+                    {recentActivity.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentActivity.map((activity) => (
+                          <div 
+                            key={activity.id}
+                            className="flex items-start gap-3 p-2 hover:bg-muted/50 rounded-lg transition-colors"
+                          >
+                            <div className="shrink-0 bg-secondary p-2 rounded-full">
+                              {activity.type === 'saved' && <Heart className="h-4 w-4 text-primary" />}
+                              {activity.type === 'search' && <Search className="h-4 w-4 text-primary" />}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm">{activity.text}</p>
+                              <p className="text-xs text-muted-foreground">{activity.time}</p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm">{activity.text}</p>
-                            <p className="text-xs text-muted-foreground">{activity.time}</p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center">
+                        <div className="bg-muted/30 p-3 rounded-lg inline-block mb-3">
+                          <Clock className="h-6 w-6 text-muted-foreground" />
                         </div>
-                      ))}
-                    </div>
+                        <h3 className="text-base font-medium mb-1">No activity yet</h3>
+                        <p className="text-sm text-muted-foreground">
+                          You haven't liked or saved anything yet. Start exploring to see your activity here!
+                        </p>
+                      </div>
+                    )}
                     
                     <Button variant="ghost" size="sm" className="w-full mt-4">
                       View All Activity
@@ -187,34 +407,38 @@ const Profile = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium mb-1">Name</label>
-                          <input 
+                          <Input 
                             type="text" 
-                            defaultValue="Thrift Enthusiast" 
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             className="w-full border border-border bg-background rounded-md px-3 py-2"
                           />
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium mb-1">Email</label>
-                          <input 
+                          <Input 
                             type="email" 
-                            defaultValue="user@example.com" 
-                            className="w-full border border-border bg-background rounded-md px-3 py-2"
+                            value={user?.email || ''}
+                            disabled
+                            className="w-full border border-border bg-background rounded-md px-3 py-2 opacity-70"
                           />
                         </div>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium mb-1">Bio</label>
-                        <textarea 
-                          defaultValue="Thrift enthusiast passionate about sustainable fashion and vintage finds." 
+                        <Textarea 
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value)}
+                          placeholder="Tell us about yourself and your style"
                           className="w-full border border-border bg-background rounded-md px-3 py-2 min-h-[100px]"
-                        ></textarea>
+                        />
                       </div>
                     </div>
                     
                     <div className="flex justify-end mt-6">
-                      <Button>
+                      <Button onClick={handleSaveProfile}>
                         Save Changes
                       </Button>
                     </div>
@@ -222,7 +446,7 @@ const Profile = () => {
                 </>
               )}
               
-              {activeTab === 'Preferences' && (
+              {!loading && activeTab === 'Preferences' && (
                 <>
                   <h1 className="text-2xl font-bold mb-6">Style Preferences</h1>
                   
@@ -231,9 +455,14 @@ const Profile = () => {
                     <h2 className="text-lg font-semibold mb-4">Favorite Styles</h2>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
-                      {['Minimalist', 'Vintage', 'Y2K', 'Streetwear', 'Bohemian', 'Preppy', 'Athleisure', 'Grunge'].map(style => (
+                      {STYLE_CATEGORIES.map(style => (
                         <label key={style} className="flex items-center gap-2">
-                          <input type="checkbox" className="rounded" />
+                          <input 
+                            type="checkbox" 
+                            checked={selectedStyles.includes(style)}
+                            onChange={() => handleStyleSelect(style)}
+                            className="rounded" 
+                          />
                           <span>{style}</span>
                         </label>
                       ))}
@@ -244,49 +473,65 @@ const Profile = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">Tops</label>
-                        <select className="w-full border border-border rounded-md p-2 bg-background">
-                          <option>Select Size</option>
-                          <option>XS</option>
-                          <option>S</option>
-                          <option>M</option>
-                          <option>L</option>
-                          <option>XL</option>
+                        <select 
+                          className="w-full border border-border rounded-md p-2 bg-background"
+                          value={sizes.tops}
+                          onChange={(e) => setSizes({...sizes, tops: e.target.value})}
+                        >
+                          <option value="">Select Size</option>
+                          <option value="XS">XS</option>
+                          <option value="S">S</option>
+                          <option value="M">M</option>
+                          <option value="L">L</option>
+                          <option value="XL">XL</option>
                         </select>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium mb-2">Bottoms</label>
-                        <select className="w-full border border-border rounded-md p-2 bg-background">
-                          <option>Select Size</option>
-                          <option>26</option>
-                          <option>28</option>
-                          <option>30</option>
-                          <option>32</option>
-                          <option>34</option>
+                        <select 
+                          className="w-full border border-border rounded-md p-2 bg-background"
+                          value={sizes.bottoms}
+                          onChange={(e) => setSizes({...sizes, bottoms: e.target.value})}
+                        >
+                          <option value="">Select Size</option>
+                          <option value="26">26</option>
+                          <option value="28">28</option>
+                          <option value="30">30</option>
+                          <option value="32">32</option>
+                          <option value="34">34</option>
                         </select>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium mb-2">Shoes</label>
-                        <select className="w-full border border-border rounded-md p-2 bg-background">
-                          <option>Select Size</option>
-                          <option>US 6</option>
-                          <option>US 7</option>
-                          <option>US 8</option>
-                          <option>US 9</option>
-                          <option>US 10</option>
+                        <select 
+                          className="w-full border border-border rounded-md p-2 bg-background"
+                          value={sizes.shoes}
+                          onChange={(e) => setSizes({...sizes, shoes: e.target.value})}
+                        >
+                          <option value="">Select Size</option>
+                          <option value="US 6">US 6</option>
+                          <option value="US 7">US 7</option>
+                          <option value="US 8">US 8</option>
+                          <option value="US 9">US 9</option>
+                          <option value="US 10">US 10</option>
                         </select>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium mb-2">Outerwear</label>
-                        <select className="w-full border border-border rounded-md p-2 bg-background">
-                          <option>Select Size</option>
-                          <option>XS</option>
-                          <option>S</option>
-                          <option>M</option>
-                          <option>L</option>
-                          <option>XL</option>
+                        <select 
+                          className="w-full border border-border rounded-md p-2 bg-background"
+                          value={sizes.outerwear}
+                          onChange={(e) => setSizes({...sizes, outerwear: e.target.value})}
+                        >
+                          <option value="">Select Size</option>
+                          <option value="XS">XS</option>
+                          <option value="S">S</option>
+                          <option value="M">M</option>
+                          <option value="L">L</option>
+                          <option value="XL">XL</option>
                         </select>
                       </div>
                     </div>
@@ -302,17 +547,18 @@ const Profile = () => {
                         type="range" 
                         min="0" 
                         max="200" 
-                        defaultValue="100"
+                        value={priceRange}
+                        onChange={(e) => setPriceRange(parseInt(e.target.value))}
                         className="w-full" 
                       />
                       <div className="flex justify-between mt-2 text-sm text-muted-foreground">
                         <span>Budget</span>
-                        <span>Max: $100</span>
+                        <span>Max: ${priceRange}</span>
                       </div>
                     </div>
                     
                     <div className="flex justify-end mt-6">
-                      <Button>
+                      <Button onClick={handleSavePreferences}>
                         Save Preferences
                       </Button>
                     </div>
@@ -320,7 +566,7 @@ const Profile = () => {
                 </>
               )}
               
-              {activeTab === 'Subscription' && (
+              {!loading && activeTab === 'Subscription' && (
                 <>
                   <h1 className="text-2xl font-bold mb-6">Your Subscription</h1>
                   
@@ -403,7 +649,7 @@ const Profile = () => {
                 </>
               )}
               
-              {activeTab === 'Notifications' && (
+              {!loading && activeTab === 'Notifications' && (
                 <>
                   <h1 className="text-2xl font-bold mb-6">Notification Settings</h1>
                   

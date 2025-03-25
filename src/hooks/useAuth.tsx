@@ -2,6 +2,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   session: Session | null;
@@ -21,8 +22,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          toast.success('Signed in successfully');
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          toast.success('Signed out successfully');
+        }
         setLoading(false);
       }
     );

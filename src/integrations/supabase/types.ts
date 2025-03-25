@@ -166,16 +166,22 @@ export type Database = {
       }
       user_style_preferences: {
         Row: {
+          price_range: Json | null
+          sizes: Json | null
           style_scores: Json | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          price_range?: Json | null
+          sizes?: Json | null
           style_scores?: Json | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          price_range?: Json | null
+          sizes?: Json | null
           style_scores?: Json | null
           updated_at?: string | null
           user_id?: string
