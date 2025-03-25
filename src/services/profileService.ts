@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Json } from '@/integrations/supabase/types';
 
 export interface StyleScore {
   [style: string]: number;
@@ -75,7 +76,25 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
     return null;
   }
   
-  return data as StylePreference;
+  if (!data) return null;
+  
+  // Transform the Json data to match our StylePreference interface
+  const transformedData: StylePreference = {
+    user_id: data.user_id,
+    style_scores: data.style_scores as StyleScore,
+    sizes: data.sizes as {
+      tops: string | null;
+      bottoms: string | null;
+      shoes: string | null;
+      outerwear: string | null;
+    },
+    price_range: data.price_range as {
+      min: number;
+      max: number;
+    }
+  };
+  
+  return transformedData;
 };
 
 // Update user style preferences
