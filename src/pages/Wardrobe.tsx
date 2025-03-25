@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { WardrobeGrid } from '@/components/ui/WardrobeGrid';
@@ -9,9 +8,8 @@ import {
   Upload, 
   LucideIcon, 
   ShirtIcon,
-  Pants, 
+  Clothing, 
   Footprints,
-  Hat,
   Glasses,
   ChevronDown
 } from 'lucide-react';
@@ -136,7 +134,7 @@ const Wardrobe = () => {
   const categories = [
     { icon: ShirtIcon, label: 'All', count: wardrobeItems.length },
     { icon: ShirtIcon, label: 'Tops', count: wardrobeItems.filter(i => i.category === 'Tops').length },
-    { icon: Pants, label: 'Bottoms', count: wardrobeItems.filter(i => i.category === 'Bottoms').length },
+    { icon: Clothing, label: 'Bottoms', count: wardrobeItems.filter(i => i.category === 'Bottoms').length },
     { icon: ShirtIcon, label: 'Outerwear', count: wardrobeItems.filter(i => i.category === 'Outerwear').length },
     { icon: Footprints, label: 'Footwear', count: wardrobeItems.filter(i => i.category === 'Footwear').length },
     { icon: Glasses, label: 'Accessories', count: wardrobeItems.filter(i => i.category === 'Accessories').length },
