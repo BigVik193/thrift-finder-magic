@@ -9,7 +9,7 @@ import {
   Upload, 
   LucideIcon, 
   ShirtIcon,
-  Pants, 
+  TrousersIcon, 
   Footprints,
   Glasses,
   ChevronDown
@@ -135,7 +135,7 @@ const Wardrobe = () => {
   const categories = [
     { icon: ShirtIcon, label: 'All', count: wardrobeItems.length },
     { icon: ShirtIcon, label: 'Tops', count: wardrobeItems.filter(i => i.category === 'Tops').length },
-    { icon: Pants, label: 'Bottoms', count: wardrobeItems.filter(i => i.category === 'Bottoms').length },
+    { icon: TrousersIcon, label: 'Bottoms', count: wardrobeItems.filter(i => i.category === 'Bottoms').length },
     { icon: ShirtIcon, label: 'Outerwear', count: wardrobeItems.filter(i => i.category === 'Outerwear').length },
     { icon: Footprints, label: 'Footwear', count: wardrobeItems.filter(i => i.category === 'Footwear').length },
     { icon: Glasses, label: 'Accessories', count: wardrobeItems.filter(i => i.category === 'Accessories').length },
