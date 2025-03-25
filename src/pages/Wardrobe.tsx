@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '@/components/layout/Navbar';
@@ -10,7 +9,7 @@ import {
   PlusCircle, 
   Filter, 
   ShirtIcon,
-  PantsIcon, 
+  Pants, 
   Footprints,
   Glasses,
   ChevronDown,
@@ -153,7 +152,7 @@ const Wardrobe = () => {
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
     { icon: ShirtIcon, label: 'Tops', count: countByCategory.Tops },
-    { icon: TrousersIcon, label: 'Bottoms', count: countByCategory.Bottoms },
+    { icon: Pants, label: 'Bottoms', count: countByCategory.Bottoms },
     { icon: ShirtIcon, label: 'Outerwear', count: countByCategory.Outerwear },
     { icon: Footprints, label: 'Footwear', count: countByCategory.Footwear },
     { icon: Glasses, label: 'Accessories', count: countByCategory.Accessories },

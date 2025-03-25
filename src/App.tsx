@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Navbar } from "@/components/layout/Navbar";
 
 // Pages
 import Index from "./pages/Index";
@@ -28,14 +29,23 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Special route for homepage because it may have custom navbar styling */}
             <Route path="/" element={<Index />} />
+            
+            {/* Auth page has its own navbar for better UX */}
             <Route path="/auth" element={<Auth />} />
+            
+            {/* All protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/search" element={<Search />} />
             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
             <Route path="/wardrobe" element={<ProtectedRoute><Wardrobe /></ProtectedRoute>} />
             <Route path="/saved" element={<ProtectedRoute><SavedItems /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            
+            {/* Public search page */}
+            <Route path="/search" element={<Search />} />
+            
+            {/* 404 page */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
