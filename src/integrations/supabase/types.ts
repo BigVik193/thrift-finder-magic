@@ -194,7 +194,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
-          gender: Database["public"]["Enums"]["gender_enum"]
+          gender: Database["public"]["Enums"]["gender_enum"] | null
           id: string
           name: string
           profile_picture: string | null
@@ -203,7 +203,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
-          gender: Database["public"]["Enums"]["gender_enum"]
+          gender?: Database["public"]["Enums"]["gender_enum"] | null
           id: string
           name: string
           profile_picture?: string | null
@@ -212,7 +212,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
-          gender?: Database["public"]["Enums"]["gender_enum"]
+          gender?: Database["public"]["Enums"]["gender_enum"] | null
           id?: string
           name?: string
           profile_picture?: string | null

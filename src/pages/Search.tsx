@@ -18,77 +18,50 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-const searchResults = [
+const popularItems = [
   {
-    id: '1',
-    title: 'Vintage Levi\'s 501 Jeans',
-    image: 'https://images.unsplash.com/photo-1604176424472-17cd740f74e9?q=80&w=2080&auto=format&fit=crop',
-    price: '$65',
+    id: 'p1',
+    title: 'Y2K Platform Sandals',
+    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1976&auto=format&fit=crop',
+    price: '$55',
     platform: 'Depop',
-    size: 'W32',
-    condition: 'Excellent'
-  },
-  {
-    id: '2',
-    title: 'Retro Nike Windbreaker Jacket',
-    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=1972&auto=format&fit=crop',
-    price: '$48',
-    platform: 'ThredUp',
-    size: 'M',
-    condition: 'Good'
-  },
-  {
-    id: '3',
-    title: 'Y2K Graphic Baby Tee',
-    image: 'https://images.unsplash.com/photo-1562157873-818bc0726f68?q=80&w=2127&auto=format&fit=crop',
-    price: '$32',
-    platform: 'eBay',
-    size: 'S',
-    condition: 'New'
-  },
-  {
-    id: '4',
-    title: 'Vintage High Waist Pleated Trousers',
-    image: 'https://images.unsplash.com/photo-1584370848010-d7fe6bc767ec?q=80&w=1974&auto=format&fit=crop',
-    price: '$38',
-    platform: 'Poshmark',
-    size: 'W28',
-    condition: 'Good'
-  },
-  {
-    id: '5',
-    title: 'Vintage Silk Scarf Printed',
-    image: 'https://images.unsplash.com/photo-1608744882201-52a7f7f3dd60?q=80&w=1974&auto=format&fit=crop',
-    price: '$18',
-    platform: 'Etsy',
-    condition: 'Excellent'
-  },
-  {
-    id: '6',
-    title: '90s Chunky Platform Boots',
-    image: 'https://images.unsplash.com/photo-1605812860427-4024433a70fd?q=80&w=1974&auto=format&fit=crop',
-    price: '$85',
-    platform: 'Grailed',
     size: 'US 8',
     condition: 'Good'
   },
   {
-    id: '7',
-    title: 'Vintage Corduroy Overshirt',
-    image: 'https://images.unsplash.com/photo-1577900234203-28f3962ef521?q=80&w=1974&auto=format&fit=crop',
+    id: 'p2',
+    title: 'Oversized Knit Sweater',
+    image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=1964&auto=format&fit=crop',
     price: '$42',
-    platform: 'Depop',
-    size: 'L',
+    platform: 'ThredUp',
+    size: 'One Size',
+    condition: 'Excellent'
+  },
+  {
+    id: 'p3',
+    title: 'Retro Graphic T-shirt',
+    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop',
+    price: '$28',
+    platform: 'Etsy',
+    size: 'M',
+    condition: 'Vintage'
+  },
+  {
+    id: 'p4',
+    title: 'High Waist Mom Jeans',
+    image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=1974&auto=format&fit=crop',
+    price: '$58',
+    platform: 'Poshmark',
+    size: 'W30',
     condition: 'Good'
   },
   {
-    id: '8',
-    title: 'Hand Knitted Wool Sweater',
-    image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?q=80&w=2072&auto=format&fit=crop',
-    price: '$55',
-    platform: 'ThredUp',
-    size: 'M',
-    condition: 'Like New'
+    id: 'p5',
+    title: 'Mini Leather Backpack',
+    image: 'https://images.unsplash.com/photo-1575844611406-0e769eb77fbe?q=80&w=2070&auto=format&fit=crop',
+    price: '$65',
+    platform: 'eBay',
+    condition: 'New'
   },
 ];
 
@@ -139,53 +112,6 @@ const recommendedItems = [
   },
 ];
 
-const popularItems = [
-  {
-    id: 'p1',
-    title: 'Y2K Platform Sandals',
-    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1976&auto=format&fit=crop',
-    price: '$55',
-    platform: 'Depop',
-    size: 'US 8',
-    condition: 'Good'
-  },
-  {
-    id: 'p2',
-    title: 'Oversized Knit Sweater',
-    image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=1964&auto=format&fit=crop',
-    price: '$42',
-    platform: 'ThredUp',
-    size: 'One Size',
-    condition: 'Excellent'
-  },
-  {
-    id: 'p3',
-    title: 'Retro Graphic T-shirt',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop',
-    price: '$28',
-    platform: 'Etsy',
-    size: 'M',
-    condition: 'Vintage'
-  },
-  {
-    id: 'p4',
-    title: 'High Waist Mom Jeans',
-    image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=1974&auto=format&fit=crop',
-    price: '$58',
-    platform: 'Poshmark',
-    size: 'W30',
-    condition: 'Good'
-  },
-  {
-    id: 'p5',
-    title: 'Mini Leather Backpack',
-    image: 'https://images.unsplash.com/photo-1575844611406-0e769eb77fbe?q=80&w=2070&auto=format&fit=crop',
-    price: '$65',
-    platform: 'eBay',
-    condition: 'New'
-  },
-];
-
 const platforms = ["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"];
 const categories = ["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"];
 const conditions = ["Any Condition", "New", "Like New", "Good", "Fair"];
@@ -197,10 +123,13 @@ const Search = () => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [results, setResults] = useState(searchResults);
+  const [results, setResults] = useState<any[]>([]);
   const [animateIn, setAnimateIn] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -215,6 +144,7 @@ const Search = () => {
     
     if (!query.trim()) {
       setAiRecommendations([]);
+      setResults([]);
       return;
     }
 
@@ -233,8 +163,11 @@ const Search = () => {
       
       if (data.status === 'success' && data.recommended_searches && data.recommended_searches.length > 0) {
         setAiRecommendations(data.recommended_searches);
+        
+        await searchEbay(data.recommended_searches);
       } else {
         setAiRecommendations([]);
+        setResults([]);
         console.log('No recommended searches found or invalid response format:', data);
       }
     } catch (error) {
@@ -245,10 +178,51 @@ const Search = () => {
       setIsSearching(false);
     }
   };
+
+  const searchEbay = async (searchTerms: string[]) => {
+    if (!searchTerms || searchTerms.length === 0) return;
+    
+    setIsLoadingResults(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ebay-search', {
+        body: { searchTerms }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.items && Array.isArray(data.items)) {
+        const transformedItems = data.items.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          price: `$${item.price}`,
+          image: item.image,
+          platform: item.platform,
+          condition: item.condition,
+          seller_username: item.seller_username,
+          size: '',
+          url: item.url
+        }));
+        
+        setResults(transformedItems);
+        setHasMoreResults(data.items.length >= 10);
+      } else {
+        setResults([]);
+        console.log('No eBay results found');
+      }
+    } catch (error) {
+      console.error('Error searching eBay:', error);
+      toast.error('Error fetching results from eBay');
+    } finally {
+      setIsLoadingResults(false);
+    }
+  };
   
   const useRecommendedSearch = (recommendedQuery: string) => {
     setSearchQuery(recommendedQuery);
-    console.log("Using recommended search:", recommendedQuery);
+    handleSearch(recommendedQuery);
   };
   
   const toggleFilter = (filter: string) => {
@@ -263,8 +237,57 @@ const Search = () => {
     setActiveFilters([]);
   };
   
-  const saveItem = (id: string) => {
-    console.log("Saving item:", id);
+  const saveItem = async (id: string) => {
+    if (!session) {
+      toast('Please login to save items', {
+        description: 'Create an account to save items to your collection',
+        action: {
+          label: 'Login',
+          onClick: () => window.location.href = '/auth'
+        }
+      });
+      return;
+    }
+    
+    try {
+      const item = results.find(item => item.id === id);
+      if (!item) return;
+      
+      const dbItem = {
+        id: item.id,
+        title: item.title,
+        price: parseFloat(item.price.replace('$', '')),
+        currency: 'USD',
+        image: item.image,
+        platform: 'ebay',
+        seller_username: item.seller_username || 'Unknown Seller',
+        seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+        seller_feedback_score: item.seller_feedback_score || 0,
+        condition: item.condition || 'Not specified',
+        url: item.url || ''
+      };
+      
+      const { data, error } = await supabase.functions.invoke('save-listing', {
+        body: { 
+          item: dbItem,
+          userId: session.user.id
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Item saved to your collection');
+    } catch (error) {
+      console.error('Error saving item:', error);
+      toast.error('Failed to save item');
+    }
+  };
+
+  const loadMoreResults = () => {
+    setPage(prev => prev + 1);
+    setHasMoreResults(false);
   };
 
   const showSearchResults = searchQuery.trim().length > 0;
@@ -332,10 +355,12 @@ const Search = () => {
             </div>
           )}
           
-          {isSearching && (
+          {(isSearching || isLoadingResults) && (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="ml-2 text-muted-foreground">Optimizing your search...</span>
+              <span className="ml-2 text-muted-foreground">
+                {isSearching ? 'Optimizing your search...' : 'Finding thrift treasures...'}
+              </span>
             </div>
           )}
           
@@ -489,7 +514,7 @@ const Search = () => {
             </div>
           )}
           
-          {showSearchResults && (
+          {showSearchResults && !isSearching && !isLoadingResults && (
             <>
               <div className="mb-6 animate-fade-in" style={{ animationDelay: '250ms' }}>
                 <div className="flex justify-between items-center mb-4">
@@ -513,52 +538,65 @@ const Search = () => {
                     ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" 
                     : "space-y-4"
                 )}>
-                  {results.map((item, index) => (
-                    <div 
-                      key={item.id}
-                      className={cn(
-                        animateIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
-                        "transition-all duration-500"
-                      )}
-                      style={{ transitionDelay: `${index * 50}ms` }}
-                    >
-                      {viewMode === 'grid' ? (
-                        <ItemCard 
-                          item={item} 
-                          onSave={() => saveItem(item.id)}
-                        />
-                      ) : (
-                        <div className="flex gap-4 p-4 border border-border rounded-lg">
-                          <div className="w-24 h-24 bg-muted rounded-md overflow-hidden">
-                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                  {results.length > 0 ? (
+                    results.map((item, index) => (
+                      <div 
+                        key={item.id}
+                        className={cn(
+                          animateIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+                          "transition-all duration-500"
+                        )}
+                        style={{ transitionDelay: `${index * 50}ms` }}
+                      >
+                        {viewMode === 'grid' ? (
+                          <ItemCard 
+                            item={item} 
+                            onSave={() => saveItem(item.id)}
+                          />
+                        ) : (
+                          <div className="flex gap-4 p-4 border border-border rounded-lg">
+                            <div className="w-24 h-24 bg-muted rounded-md overflow-hidden">
+                              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium">{item.title}</h3>
+                              <p className="text-muted-foreground text-sm mb-1">
+                                {item.platform} • {item.condition} • {item.size || 'N/A'}
+                              </p>
+                              <p className="font-semibold">{item.price}</p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => saveItem(item.id)}
+                              className="h-10 px-3"
+                            >
+                              Save
+                            </Button>
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-medium">{item.title}</h3>
-                            <p className="text-muted-foreground text-sm mb-1">
-                              {item.platform} • {item.condition} • {item.size || 'N/A'}
-                            </p>
-                            <p className="font-semibold">{item.price}</p>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => saveItem(item.id)}
-                            className="h-10 px-3"
-                          >
-                            Save
-                          </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-10">
+                      <p className="text-muted-foreground">No items found. Try a different search.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
               
-              <div className="flex justify-center mt-8 animate-fade-in" style={{ animationDelay: '300ms' }}>
-                <Button variant="outline" size="lg">
-                  Load More Results
-                </Button>
-              </div>
+              {results.length > 0 && (
+                <div className="flex justify-center mt-8 animate-fade-in" style={{ animationDelay: '300ms' }}>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={loadMoreResults}
+                    disabled={!hasMoreResults}
+                  >
+                    {hasMoreResults ? 'Load More Results' : 'No More Results'}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>

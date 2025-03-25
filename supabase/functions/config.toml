@@ -1,2 +1,16 @@
 
 project_id = "lzgbtbnnsphqqqttfrzx"
+
+[db_config]
+port = 5432
+engine = "postgres"
+database = "postgres"
+
+[edge_functions.ebay-search]
+verify_jwt = false
+
+[edge_functions.thrift-search]
+verify_jwt = false
+
+[edge_functions.save-listing]
+verify_jwt = false
