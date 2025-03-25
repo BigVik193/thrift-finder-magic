@@ -9,7 +9,6 @@ import {
   PlusCircle, 
   Filter, 
   ShirtIcon,
-  PantsIcon, 
   Footprints,
   Glasses,
   ChevronDown,
@@ -146,7 +145,7 @@ const Wardrobe = () => {
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
     { icon: ShirtIcon, label: 'Tops', count: countByCategory.Tops },
-    { icon: PantsIcon, label: 'Bottoms', count: countByCategory.Bottoms },
+    { icon: ShirtIcon, label: 'Bottoms', count: countByCategory.Bottoms },
     { icon: ShirtIcon, label: 'Outerwear', count: countByCategory.Outerwear },
     { icon: Footprints, label: 'Footwear', count: countByCategory.Footwear },
     { icon: Glasses, label: 'Accessories', count: countByCategory.Accessories },
