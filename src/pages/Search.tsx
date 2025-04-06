@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -39,6 +40,7 @@ const formatListingForDisplay = (listing: any) => ({
 const Search = () => {
   const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -88,14 +90,14 @@ const Search = () => {
   }, []);
   
   const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    
     if (!query.trim()) {
       setAiRecommendations([]);
       setResults([]);
+      setSubmittedQuery('');
       return;
     }
 
+    setSubmittedQuery(query);
     setIsSearching(true);
     
     try {
@@ -213,7 +215,7 @@ const Search = () => {
     setHasMoreResults(false);
   };
 
-  const showSearchResults = searchQuery.trim().length > 0;
+  const showSearchResults = submittedQuery.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -251,7 +253,7 @@ const Search = () => {
             </div>
           </div>
           
-          {searchQuery && aiRecommendations.length > 0 && (
+          {submittedQuery && aiRecommendations.length > 0 && (
             <div className="mb-6 bg-primary/5 rounded-lg p-4 flex flex-col items-start gap-3 animate-fade-in" style={{ animationDelay: '150ms' }}>
               <div className="flex items-start gap-3 w-full">
                 <div className="bg-primary/10 p-1.5 rounded-full">
@@ -278,7 +280,7 @@ const Search = () => {
             </div>
           )}
           
-          {(isSearching || isLoadingResults) && (
+          {(isSearching || isLoadingResults) && submittedQuery && (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
               <span className="ml-2 text-muted-foreground">
@@ -309,138 +311,138 @@ const Search = () => {
             </div>
           )}
           
-          <div className="mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
-              <div className="flex items-center justify-between mb-4">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                >
-                  <Filter className="h-4 w-4" />
-                  <span>Filters</span>
-                  <ChevronDown className={cn(
-                    "h-4 w-4 transition-transform",
-                    isFilterOpen ? "transform rotate-180" : ""
-                  )} />
-                </Button>
+          {showSearchResults && !isSearching && !isLoadingResults && (
+            <>
+              <div className="mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Filters</span>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 transition-transform",
+                      isFilterOpen ? "transform rotate-180" : ""
+                    )} />
+                  </Button>
+                  
+                  {activeFilters.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearFilters}
+                      className="text-muted-foreground hover:text-foreground gap-1"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Clear filters</span>
+                    </Button>
+                  )}
+                </div>
                 
                 {activeFilters.length > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearFilters}
-                    className="text-muted-foreground hover:text-foreground gap-1"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    <span>Clear filters</span>
-                  </Button>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {activeFilters.map(filter => (
+                      <div 
+                        key={filter}
+                        className="bg-secondary rounded-full px-3 py-1 text-sm flex items-center gap-1"
+                      >
+                        <span>{filter}</span>
+                        <button onClick={() => toggleFilter(filter)}>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {isFilterOpen && (
+                  <div className="bg-muted/30 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Platform</h3>
+                      <div className="space-y-1">
+                        {["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"].map(platform => (
+                          <button 
+                            key={platform}
+                            onClick={() => toggleFilter(platform)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(platform) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {platform}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Category</h3>
+                      <div className="space-y-1">
+                        {["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"].map(category => (
+                          <button 
+                            key={category}
+                            onClick={() => toggleFilter(category)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(category) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Condition</h3>
+                      <div className="space-y-1">
+                        {["Any Condition", "New", "Like New", "Good", "Fair"].map(condition => (
+                          <button 
+                            key={condition}
+                            onClick={() => toggleFilter(condition)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(condition) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {condition}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Price Range</h3>
+                      <div className="space-y-1">
+                        {["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"].map(range => (
+                          <button 
+                            key={range}
+                            onClick={() => toggleFilter(range)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(range) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {range}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
               
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {activeFilters.map(filter => (
-                    <div 
-                      key={filter}
-                      className="bg-secondary rounded-full px-3 py-1 text-sm flex items-center gap-1"
-                    >
-                      <span>{filter}</span>
-                      <button onClick={() => toggleFilter(filter)}>
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {isFilterOpen && (
-                <div className="bg-muted/30 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm">Platform</h3>
-                    <div className="space-y-1">
-                      {["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"].map(platform => (
-                        <button 
-                          key={platform}
-                          onClick={() => toggleFilter(platform)}
-                          className={cn(
-                            "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
-                            activeFilters.includes(platform) 
-                              ? "bg-primary/10 text-primary" 
-                              : "hover:bg-muted"
-                          )}
-                        >
-                          {platform}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm">Category</h3>
-                    <div className="space-y-1">
-                      {["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"].map(category => (
-                        <button 
-                          key={category}
-                          onClick={() => toggleFilter(category)}
-                          className={cn(
-                            "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
-                            activeFilters.includes(category) 
-                              ? "bg-primary/10 text-primary" 
-                              : "hover:bg-muted"
-                          )}
-                        >
-                          {category}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm">Condition</h3>
-                    <div className="space-y-1">
-                      {["Any Condition", "New", "Like New", "Good", "Fair"].map(condition => (
-                        <button 
-                          key={condition}
-                          onClick={() => toggleFilter(condition)}
-                          className={cn(
-                            "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
-                            activeFilters.includes(condition) 
-                              ? "bg-primary/10 text-primary" 
-                              : "hover:bg-muted"
-                          )}
-                        >
-                          {condition}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-medium mb-2 text-sm">Price Range</h3>
-                    <div className="space-y-1">
-                      {["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"].map(range => (
-                        <button 
-                          key={range}
-                          onClick={() => toggleFilter(range)}
-                          className={cn(
-                            "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
-                            activeFilters.includes(range) 
-                              ? "bg-primary/10 text-primary" 
-                              : "hover:bg-muted"
-                          )}
-                        >
-                          {range}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          
-          {showSearchResults && !isSearching && !isLoadingResults && (
-            <>
               <div className="mb-6 animate-fade-in" style={{ animationDelay: '250ms' }}>
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-muted-foreground">

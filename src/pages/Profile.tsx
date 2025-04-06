@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
@@ -34,26 +35,6 @@ import {
   RecentActivity
 } from '@/services/profileService';
 
-// List of all style categories
-const STYLE_CATEGORIES = [
-  'Streetwear',
-  'Minimalist',
-  'Vintage',
-  'Athleisure',
-  'Skater',
-  'Y2K',
-  'Workwear',
-  'Bohemian',
-  'Business Casual',
-  'Classic Preppy',
-  'Formalwear',
-  'Smart Casual',
-  'Goth/Techwear',
-  'Punk/Grunge',
-  'Rockstar/Edgy',
-  'Western/Cowboy',
-];
-
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('Profile');
   const [loading, setLoading] = useState(true);
@@ -67,7 +48,6 @@ const Profile = () => {
   // Form states
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [sizes, setSizes] = useState({
     tops: '',
     bottoms: '',
@@ -102,12 +82,6 @@ const Profile = () => {
       setStylePreferences(preferencesData);
       
       if (preferencesData) {
-        // Set selected styles (those with scores > 0)
-        const selected = Object.entries(preferencesData.style_scores || {})
-          .filter(([_, score]) => score > 0)
-          .map(([style]) => style);
-        setSelectedStyles(selected);
-        
         // Set price range
         if (preferencesData.price_range) {
           setPriceRange(preferencesData.price_range.max);
@@ -150,17 +124,8 @@ const Profile = () => {
   const handleSavePreferences = async () => {
     if (!stylePreferences) return;
     
-    // Create updated style scores object
-    const styleScores: StyleScore = {};
-    
-    // Set scores for selected styles to 1, others to 0
-    STYLE_CATEGORIES.forEach(style => {
-      styleScores[style] = selectedStyles.includes(style) ? 1 : 0;
-    });
-    
     // Update preferences in database
     const success = await updateStylePreferences({
-      style_scores: styleScores,
       price_range: {
         min: 0,
         max: priceRange
@@ -179,30 +144,6 @@ const Profile = () => {
       setStylePreferences(updatedPrefs);
     }
   };
-  
-  const handleStyleSelect = (style: string) => {
-    setSelectedStyles(prev => 
-      prev.includes(style)
-        ? prev.filter(s => s !== style)
-        : [...prev, style]
-    );
-  };
-  
-  // Get top styles based on scores
-  const getTopStyles = () => {
-    if (!stylePreferences?.style_scores) return [];
-    
-    return Object.entries(stylePreferences.style_scores)
-      .filter(([_, score]) => score > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([style, score]) => ({
-        name: style,
-        percentage: Math.min(100, Math.max(0, score * 100))
-      }));
-  };
-  
-  const topStyles = getTopStyles();
   
   const tabs = [
     { name: 'Profile', icon: User },
@@ -305,60 +246,6 @@ const Profile = () => {
                 <>
                   <h1 className="text-2xl font-bold mb-6">Your Profile</h1>
                   
-                  {/* Style Analysis Card */}
-                  <div className="glass-card p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold">Your Style Analysis</h2>
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                        <Upload className="h-3.5 w-3.5" />
-                        <span>Upload More</span>
-                      </Button>
-                    </div>
-                    
-                    {topStyles.length > 0 ? (
-                      <div className="space-y-4">
-                        {topStyles.map(style => (
-                          <div key={style.name}>
-                            <div className="flex justify-between mb-1">
-                              <span className="text-sm font-medium">{style.name}</span>
-                              <span className="text-sm text-muted-foreground">{style.percentage}%</span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary" 
-                                style={{ width: `${style.percentage}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-6 text-center">
-                        <div className="bg-muted/30 p-3 rounded-lg inline-block mb-3">
-                          <Search className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-base font-medium mb-1">Still learning your style</h3>
-                        <p className="text-sm text-muted-foreground">
-                          We're still learning your style preferences. Keep engaging with items to help us get to know your tastes better!
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="mt-6 pt-4 border-t border-border">
-                      <div className="flex items-start gap-3">
-                        <div className="shrink-0 bg-primary/10 p-2 rounded-full">
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-sm">Style Match</h3>
-                          <p className="text-sm text-muted-foreground">
-                            We'll use this information to find thrift pieces that match your personal style.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
                   {/* Recent Activity */}
                   <div className="glass-card p-6 mb-6">
                     <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
@@ -452,22 +339,6 @@ const Profile = () => {
                   
                   {/* Preferences Content */}
                   <div className="glass-card p-6 mb-6">
-                    <h2 className="text-lg font-semibold mb-4">Favorite Styles</h2>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
-                      {STYLE_CATEGORIES.map(style => (
-                        <label key={style} className="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedStyles.includes(style)}
-                            onChange={() => handleStyleSelect(style)}
-                            className="rounded" 
-                          />
-                          <span>{style}</span>
-                        </label>
-                      ))}
-                    </div>
-                    
                     <h2 className="text-lg font-semibold mb-4">Sizes</h2>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">

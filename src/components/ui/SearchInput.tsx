@@ -52,9 +52,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       } as React.ChangeEvent<HTMLInputElement>;
       externalOnChange(syntheticEvent);
     }
-    
-    // Call onSearch with empty string
-    if (onSearch) onSearch('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {

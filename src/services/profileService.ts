@@ -1,187 +1,165 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Json } from '@/integrations/supabase/types';
-
-export interface StyleScore {
-  [style: string]: number;
-}
 
 export interface UserProfile {
   id: string;
-  email: string;
   name: string;
-  gender: 'Male' | 'Female' | 'Other' | null;
+  email: string;
   profile_picture: string | null;
+  gender: 'male' | 'female' | 'other' | 'unspecified' | null;
 }
 
 export interface StylePreference {
   user_id: string;
-  style_scores: StyleScore;
-  sizes?: {
+  sizes: {
     tops: string | null;
     bottoms: string | null;
     shoes: string | null;
     outerwear: string | null;
   };
-  price_range?: {
+  price_range: {
     min: number;
     max: number;
   };
 }
+
+export type StyleScore = Record<string, number>;
 
 export interface RecentActivity {
   id: string;
   type: 'saved' | 'search';
   text: string;
   time: string;
-  image?: string;
-  listing_id?: string;
 }
 
-// Fetch user profile data
 export const getUserProfile = async (): Promise<UserProfile | null> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return null;
-  
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     
-  if (error) {
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (error) throw error;
+    
+    return data as UserProfile;
+  } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
   }
-  
-  return data as UserProfile;
 };
 
-// Fetch user style preferences
 export const getUserStylePreferences = async (): Promise<StylePreference | null> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return null;
-  
-  const { data, error } = await supabase
-    .from('user_style_preferences')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     
-  if (error) {
-    console.error('Error fetching style preferences:', error);
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from('user_style_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (error) throw error;
+    
+    return data as StylePreference;
+  } catch (error) {
+    console.error('Error fetching user style preferences:', error);
     return null;
   }
-  
-  if (!data) return null;
-  
-  // Transform the Json data to match our StylePreference interface
-  const transformedData: StylePreference = {
-    user_id: data.user_id,
-    style_scores: data.style_scores as StyleScore,
-    sizes: data.sizes as {
-      tops: string | null;
-      bottoms: string | null;
-      shoes: string | null;
-      outerwear: string | null;
-    },
-    price_range: data.price_range as {
-      min: number;
-      max: number;
-    }
-  };
-  
-  return transformedData;
 };
 
-// Update user style preferences
-export const updateStylePreferences = async (
-  preferences: Partial<StylePreference>
-): Promise<boolean> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return false;
-  
-  const { error } = await supabase
-    .from('user_style_preferences')
-    .update(preferences)
-    .eq('user_id', user.id);
+export const updateStylePreferences = async (preferences: Partial<StylePreference>): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     
-  if (error) {
+    if (!user) {
+      toast.error('You must be logged in to update preferences');
+      return false;
+    }
+    
+    const { error } = await supabase
+      .from('user_style_preferences')
+      .update(preferences)
+      .eq('user_id', user.id);
+    
+    if (error) throw error;
+    
+    toast.success('Style preferences updated successfully');
+    return true;
+  } catch (error) {
     console.error('Error updating style preferences:', error);
-    toast.error('Failed to update preferences');
+    toast.error('Failed to update style preferences');
     return false;
   }
-  
-  toast.success('Preferences updated successfully');
-  return true;
 };
 
-// Get user's recent activity (saved items)
-export const getRecentActivity = async (limit = 4): Promise<RecentActivity[]> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return [];
-  
-  // Get saved items
-  const { data: savedItems, error: savedError } = await supabase
-    .from('saved_items')
-    .select('*, listings(*)')
-    .eq('user_id', user.id)
-    .order('saved_at', { ascending: false })
-    .limit(limit);
+export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     
-  if (savedError) {
-    console.error('Error fetching saved items:', savedError);
+    if (!user) return [];
+    
+    // Get saved items activity
+    const { data: savedItems, error: savedError } = await supabase
+      .from('saved_items')
+      .select('listing_id, saved_at, listings(title)')
+      .eq('user_id', user.id)
+      .order('saved_at', { ascending: false })
+      .limit(limit);
+    
+    if (savedError) throw savedError;
+    
+    // Get search activity
+    const { data: searches, error: searchError } = await supabase
+      .from('user_searches')
+      .select('id, query, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (searchError) throw searchError;
+    
+    // Combine and format activities
+    const savedActivity = (savedItems || []).map(item => ({
+      id: item.listing_id,
+      type: 'saved' as const,
+      text: `You saved "${item.listings?.title || 'an item'}"`,
+      time: format(new Date(item.saved_at), 'MMM d, h:mm a')
+    }));
+    
+    const searchActivity = (searches || []).map(search => ({
+      id: search.id,
+      type: 'search' as const,
+      text: `You searched for "${search.query}"`,
+      time: format(new Date(search.created_at), 'MMM d, h:mm a')
+    }));
+    
+    // Combine and sort by time (newest first)
+    const allActivity = [...savedActivity, ...searchActivity]
+      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+      .slice(0, limit);
+    
+    return allActivity;
+  } catch (error) {
+    console.error('Error fetching recent activity:', error);
     return [];
   }
-  
-  const activities: RecentActivity[] = savedItems.map(item => ({
-    id: item.listing_id,
-    type: 'saved',
-    text: `Saved "${item.listings.title}"`,
-    time: formatTimeAgo(new Date(item.saved_at)),
-    image: item.listings.image,
-    listing_id: item.listing_id
-  }));
-  
-  return activities;
 };
 
-// Format time to relative format (e.g., "2 hours ago")
-const formatTimeAgo = (date: Date): string => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + ' years ago';
-  
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + ' months ago';
-  
-  interval = seconds / 86400;
-  if (interval > 1) return Math.floor(interval) + ' days ago';
-  
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + ' hours ago';
-  
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + ' minutes ago';
-  
-  return Math.floor(seconds) + ' seconds ago';
-};
-
-// Sign out user
 export const signOutUser = async (): Promise<void> => {
-  const { error } = await supabase.auth.signOut();
-  
-  if (error) {
+  try {
+    await supabase.auth.signOut();
+    toast.success('Signed out successfully');
+  } catch (error) {
     console.error('Error signing out:', error);
     toast.error('Failed to sign out');
-    return;
   }
-  
-  toast.success('Signed out successfully');
 };
