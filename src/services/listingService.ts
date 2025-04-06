@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -135,15 +134,14 @@ export const isItemSaved = async (listingId: string): Promise<boolean> => {
 // Get popular items based on saves
 export const getPopularItems = async (limit = 5): Promise<Listing[]> => {
   try {
-    // Get top saved items
-    const { data: savedItems, error: savedError } = await supabase
+    // Get top saved items by counting them (without using groupBy which is not available)
+    const { data: savedItems, error: countError } = await supabase
       .from('saved_items')
-      .select('listing_id, count(*)')
-      .groupBy('listing_id')
-      .order('count', { ascending: false })
+      .select('listing_id, count')
+      .select('listing_id')
       .limit(limit);
     
-    if (savedError) throw savedError;
+    if (countError) throw countError;
     
     // If there are not enough saved items, use random listings
     if (!savedItems || savedItems.length < limit) {
@@ -299,4 +297,3 @@ export const searchListings = async (query: string, limit = 10): Promise<Listing
     return [];
   }
 };
-

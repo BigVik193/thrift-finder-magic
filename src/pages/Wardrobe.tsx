@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getOrCreateWardrobe, getClothingItems, deleteClothingItem, ClothingItem } from '@/services/wardrobeService';
+import { getRecommendedItems } from '@/services/listingService';
 
 interface CategoryTabProps {
   icon: React.ElementType;
