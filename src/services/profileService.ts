@@ -78,11 +78,19 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
     
     if (error) throw error;
     
-    // Parse the sizes JSON object safely
-    const sizesData = typeof data.sizes === 'object' ? data.sizes : {};
+    // Parse the sizes JSON object safely with more explicit type handling
+    let sizesData: Record<string, string | null> = {};
+    if (data.sizes && typeof data.sizes === 'object' && !Array.isArray(data.sizes)) {
+      sizesData = data.sizes as Record<string, string | null>;
+    }
     
-    // Parse the price_range JSON object safely
-    const priceRangeData = typeof data.price_range === 'object' ? data.price_range : {};
+    // Parse the price_range JSON object safely with more explicit type handling
+    let priceRangeData: Record<string, number> = { min: 0, max: 100 };
+    if (data.price_range && typeof data.price_range === 'object' && !Array.isArray(data.price_range)) {
+      const priceRange = data.price_range as Record<string, unknown>;
+      if (typeof priceRange.min === 'number') priceRangeData.min = priceRange.min;
+      if (typeof priceRange.max === 'number') priceRangeData.max = priceRange.max;
+    }
     
     // Transform the database JSON to match our interface
     const transformedData: StylePreference = {
@@ -94,8 +102,8 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
         outerwear: sizesData.outerwear || null
       },
       price_range: {
-        min: typeof priceRangeData.min === 'number' ? priceRangeData.min : 0,
-        max: typeof priceRangeData.max === 'number' ? priceRangeData.max : 100
+        min: priceRangeData.min,
+        max: priceRangeData.max
       }
     };
     
