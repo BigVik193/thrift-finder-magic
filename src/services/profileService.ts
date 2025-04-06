@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -48,7 +47,16 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     
     if (error) throw error;
     
-    return data as UserProfile;
+    // Transform the database gender enum to match our interface
+    const transformedData: UserProfile = {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      profile_picture: data.profile_picture,
+      gender: data.gender ? data.gender.toLowerCase() as 'male' | 'female' | 'other' : null
+    };
+    
+    return transformedData;
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -69,7 +77,22 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
     
     if (error) throw error;
     
-    return data as StylePreference;
+    // Transform the database JSON to match our interface
+    const transformedData: StylePreference = {
+      user_id: data.user_id,
+      sizes: {
+        tops: data.sizes?.tops || null,
+        bottoms: data.sizes?.bottoms || null,
+        shoes: data.sizes?.shoes || null,
+        outerwear: data.sizes?.outerwear || null
+      },
+      price_range: {
+        min: data.price_range?.min || 0,
+        max: data.price_range?.max || 100
+      }
+    };
+    
+    return transformedData;
   } catch (error) {
     console.error('Error fetching user style preferences:', error);
     return null;
