@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -77,18 +78,24 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
     
     if (error) throw error;
     
+    // Parse the sizes JSON object safely
+    const sizesData = typeof data.sizes === 'object' ? data.sizes : {};
+    
+    // Parse the price_range JSON object safely
+    const priceRangeData = typeof data.price_range === 'object' ? data.price_range : {};
+    
     // Transform the database JSON to match our interface
     const transformedData: StylePreference = {
       user_id: data.user_id,
       sizes: {
-        tops: data.sizes?.tops || null,
-        bottoms: data.sizes?.bottoms || null,
-        shoes: data.sizes?.shoes || null,
-        outerwear: data.sizes?.outerwear || null
+        tops: sizesData.tops || null,
+        bottoms: sizesData.bottoms || null,
+        shoes: sizesData.shoes || null,
+        outerwear: sizesData.outerwear || null
       },
       price_range: {
-        min: data.price_range?.min || 0,
-        max: data.price_range?.max || 100
+        min: typeof priceRangeData.min === 'number' ? priceRangeData.min : 0,
+        max: typeof priceRangeData.max === 'number' ? priceRangeData.max : 100
       }
     };
     
