@@ -57,6 +57,7 @@ export type Database = {
         Row: {
           condition: string
           currency: string
+          embedding: string | null
           id: string
           image: string
           last_updated: string | null
@@ -71,6 +72,7 @@ export type Database = {
         Insert: {
           condition: string
           currency: string
+          embedding?: string | null
           id: string
           image: string
           last_updated?: string | null
@@ -85,6 +87,7 @@ export type Database = {
         Update: {
           condition?: string
           currency?: string
+          embedding?: string | null
           id?: string
           image?: string
           last_updated?: string | null
@@ -131,6 +134,42 @@ export type Database = {
           },
         ]
       }
+      user_recommendations: {
+        Row: {
+          created_at: string | null
+          listing_id: string
+          similarity_score: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          listing_id: string
+          similarity_score?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          listing_id?: string
+          similarity_score?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_recommendations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_searches: {
         Row: {
           created_at: string | null
@@ -165,6 +204,7 @@ export type Database = {
           price_range: Json | null
           sizes: Json | null
           style_scores: Json | null
+          style_vector: string | null
           updated_at: string | null
           user_id: string
         }
@@ -172,6 +212,7 @@ export type Database = {
           price_range?: Json | null
           sizes?: Json | null
           style_scores?: Json | null
+          style_vector?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -179,6 +220,7 @@ export type Database = {
           price_range?: Json | null
           sizes?: Json | null
           style_scores?: Json | null
+          style_vector?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -259,7 +301,196 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      binary_quantize:
+        | {
+            Args: {
+              "": string
+            }
+            Returns: unknown
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: unknown
+          }
+      get_similar_listings: {
+        Args: {
+          user_vector: string
+          exclude_ids: string[]
+          result_limit?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          price: number
+          currency: string
+          image: string
+          platform: string
+          condition: string
+          url: string
+          similarity: number
+        }[]
+      }
+      halfvec_avg: {
+        Args: {
+          "": number[]
+        }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
+      hnsw_bit_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflat_bit_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      l2_norm:
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+      l2_normalize:
+        | {
+            Args: {
+              "": string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: unknown
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: unknown
+          }
+      sparsevec_out: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
+      vector_avg: {
+        Args: {
+          "": number[]
+        }
+        Returns: string
+      }
+      vector_dims:
+        | {
+            Args: {
+              "": string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+      vector_norm: {
+        Args: {
+          "": string
+        }
+        Returns: number
+      }
+      vector_out: {
+        Args: {
+          "": string
+        }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: {
+          "": string
+        }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
     }
     Enums: {
       gender_enum: "Male" | "Female" | "Other"

@@ -138,8 +138,8 @@ export const getPopularItems = async (limit = 5): Promise<Listing[]> => {
     // Get top saved items
     const { data: savedItems, error: savedError } = await supabase
       .from('saved_items')
-      .select('listing_id, count')
-      .group('listing_id')
+      .select('listing_id, count(*)')
+      .groupBy('listing_id')
       .order('count', { ascending: false })
       .limit(limit);
     
@@ -173,20 +173,64 @@ export const getPopularItems = async (limit = 5): Promise<Listing[]> => {
   }
 };
 
-// Get recommended items (currently random)
+// Get recommended items using the recommendation edge function
 export const getRecommendedItems = async (limit = 5): Promise<Listing[]> => {
   try {
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*')
-      .limit(limit);
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (error) throw error;
-    
-    return (data || []) as Listing[];
+    if (!user) {
+      console.log('No user found, returning random items');
+      // Return random items if user is not logged in
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .limit(limit);
+      
+      if (error) throw error;
+      
+      return (data || []) as Listing[];
+    }
+
+    // Call the recommendation edge function
+    const { data, error } = await supabase.functions.invoke('get-recommendations', {
+      body: { user_id: user.id, limit },
+    });
+
+    if (error) {
+      console.error('Error calling recommendations function:', error);
+      throw error;
+    }
+
+    // If no recommendations or empty results, return random items
+    if (!data || !data.results || data.results.length === 0) {
+      console.log('No recommendations returned, falling back to random items');
+      const { data: randomItems, error: randomError } = await supabase
+        .from('listings')
+        .select('*')
+        .limit(limit);
+      
+      if (randomError) throw randomError;
+      
+      return (randomItems || []) as Listing[];
+    }
+
+    return data.results as Listing[];
   } catch (error) {
     console.error('Error getting recommended items:', error);
-    return [];
+    // Fall back to random items if there's an error
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .limit(limit);
+      
+      if (error) throw error;
+      
+      return (data || []) as Listing[];
+    } catch (fallbackError) {
+      console.error('Error getting fallback random items:', fallbackError);
+      return [];
+    }
   }
 };
 
@@ -255,3 +299,4 @@ export const searchListings = async (query: string, limit = 10): Promise<Listing
     return [];
   }
 };
+

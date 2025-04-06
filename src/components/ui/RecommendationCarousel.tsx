@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/carousel";
 import { ItemCard } from '@/components/ui/ItemCard';
 import { Sparkles, Loader2 } from 'lucide-react';
+import { Listing } from '@/services/listingService';
 
 interface RecommendationItem {
   id: string;
@@ -27,9 +28,21 @@ interface RecommendationCarouselProps {
   onSaveItem?: (id: string, isSaved: boolean) => void;
   className?: string;
   isLoading?: boolean;
-  fetchItems?: () => Promise<RecommendationItem[]>;
+  fetchItems?: () => Promise<Listing[]>;
   emptyMessage?: string;
 }
+
+// Helper function to convert Listing to RecommendationItem
+const convertListingToRecommendationItem = (listing: Listing): RecommendationItem => {
+  return {
+    id: listing.id,
+    title: listing.title,
+    image: listing.image,
+    price: `${listing.currency} ${listing.price}`,
+    platform: listing.platform,
+    condition: listing.condition
+  };
+};
 
 export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   title,
@@ -43,16 +56,21 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
 }) => {
   const [items, setItems] = useState<RecommendationItem[]>(initialItems || []);
   const [isLoading, setIsLoading] = useState(initialLoading);
+  const [hasLoadedData, setHasLoadedData] = useState(false);
 
   useEffect(() => {
     if (initialItems) {
       setItems(initialItems);
+      setHasLoadedData(true);
     } else if (fetchItems) {
       const loadItems = async () => {
         setIsLoading(true);
         try {
-          const fetchedItems = await fetchItems();
-          setItems(fetchedItems);
+          const fetchedListings = await fetchItems();
+          // Convert Listing objects to RecommendationItem objects
+          const convertedItems = fetchedListings.map(convertListingToRecommendationItem);
+          setItems(convertedItems);
+          setHasLoadedData(true);
         } catch (error) {
           console.error(`Error fetching items for ${title}:`, error);
         } finally {
@@ -85,7 +103,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
     );
   }
 
-  if (items.length === 0) {
+  if ((items.length === 0) && hasLoadedData) {
     return (
       <div className={className}>
         <div className="flex items-start gap-2 mb-4">
@@ -100,7 +118,9 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
           </div>
         </div>
         <div className="bg-muted/40 rounded-lg p-6 text-center">
-          <p className="text-muted-foreground">{emptyMessage}</p>
+          <p className="text-muted-foreground">
+            {emptyMessage || "We're still learning your style. Save a few items to start seeing recommendations here!"}
+          </p>
         </div>
       </div>
     );

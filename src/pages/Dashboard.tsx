@@ -245,7 +245,7 @@ const Dashboard = () => {
               description="Items we think you'll love based on your style"
               fetchItems={() => getRecommendedItems(4)}
               onSaveItem={handleSaveItem}
-              emptyMessage="We're still learning your style preferences. Continue exploring to get personalized recommendations!"
+              emptyMessage="We're still learning your style preferences. Save a few items to get personalized recommendations!"
             />
           </section>
           

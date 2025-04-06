@@ -314,8 +314,12 @@ const Wardrobe = () => {
                     <RecommendationCarousel
                       title="Recommended For Your Wardrobe"
                       description="Items that would complement your current wardrobe"
-                      items={recommendedItems}
-                      onSaveItem={saveRecommendedItem}
+                      fetchItems={() => getRecommendedItems(4)}
+                      onSaveItem={(id, isSaved) => {
+                        console.log("Saving recommended item:", id, isSaved);
+                        toast.success(isSaved ? 'Item saved to your collection' : 'Item removed from your collection');
+                      }}
+                      emptyMessage="We're still learning your style. Save a few items to start seeing recommendations!"
                     />
                   </div>
                 )}
