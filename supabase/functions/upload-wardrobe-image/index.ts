@@ -32,8 +32,11 @@ serve(async (req) => {
         const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
         const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
         const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+        const HUGGINGFACE_API_KEY = Deno.env.get('HUGGINGFACE_API_KEY');
 
         if (!OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
+        if (!HUGGINGFACE_API_KEY)
+            throw new Error('Missing HUGGINGFACE_API_KEY');
 
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -85,48 +88,39 @@ serve(async (req) => {
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Describe image and classify type using GPT-4 Vision
-        const visionRes = await fetch(
-            'https://api.openai.com/v1/chat/completions',
+        // 4. Prepare prompt with inline base64 image for IDEFICS
+        // const promptWithImage = `User: Describe the clothing item in the image and respond with format: '<Type>: <Description>'. Type must be one of: Tops, Bottoms, Outerwear, Footwear, or Other. Description should describe the clothing item in detail. ![](data:image/jpeg;base64,${base64Str})<end_of_utterance>\nAssistant:`;
+        const promptWithImage = `User: Describe the clothing item in the image and respond with format: '<Type>: <Description>'. Type must be one of: Tops, Bottoms, Outerwear, Footwear, or Other. Description should describe the clothing item in detail. ![](data:image/jpeg;base64,${imageUrl})<end_of_utterance>\nAssistant:`;
+
+        // Send request to IDEFICS 9B model (Instruct version recommended)
+        const ideficsResponse = await fetch(
+            'https://api-inference.huggingface.co/models/HuggingFaceM4/idefics-9b-instruct',
             {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${OPENAI_API_KEY}`,
+                    Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4-vision-preview',
-                    messages: [
-                        {
-                            role: 'system',
-                            content:
-                                'You are a fashion expert. Describe the clothing item in this image using detailed language and classify it as one of the following types: Tops, Bottoms, Outerwear, Footwear, or Other. Return only a JSON object with two fields: "description" and "type". The "type" must exactly match one of the five values.',
-                        },
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'image_url',
-                                    image_url: { url: imageUrl },
-                                },
-                                {
-                                    type: 'text',
-                                    text: 'Please describe the clothing item for use in a fashion embedding system and return the JSON.',
-                                },
-                            ],
-                        },
-                    ],
-                    max_tokens: 300,
+                    inputs: promptWithImage,
+                    parameters: {
+                        max_new_tokens: 300,
+                        temperature: 0.2,
+                        top_p: 0.9,
+                        stop: ['<end_of_utterance>', '\nUser:'],
+                    },
                 }),
             }
         );
 
-        const visionData = await visionRes.json();
-        if (!visionRes.ok || !visionData.choices?.[0]?.message?.content) {
-            console.error('GPT-4 Vision error:', visionData);
-            throw new Error('Failed to get clothing description from GPT-4');
+        const ideficsData = await ideficsResponse.json();
+
+        if (!ideficsResponse.ok || !ideficsData.generated_text) {
+            console.error('IDEFICS API error:', ideficsData);
+            throw new Error('Failed to get clothing description from IDEFICS');
         }
 
+        // Parse the response with simple string parsing
         let description: string;
         let clothingType:
             | 'Tops'
@@ -136,24 +130,93 @@ serve(async (req) => {
             | 'Other';
 
         try {
-            const content = visionData.choices[0].message.content.trim();
-            const parsed = JSON.parse(content);
+            const generatedText = ideficsData.generated_text.trim();
 
-            description = parsed.description;
-            clothingType = parsed.type;
+            // Look for the format "<Type>: <Description>"
+            const formatMatch = generatedText.match(
+                /^(Tops|Bottoms|Outerwear|Footwear|Other):\s*(.+)$/is
+            );
 
-            if (
-                !['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Other'].includes(
-                    clothingType
-                )
-            ) {
-                throw new Error(`Invalid clothing type: ${clothingType}`);
+            if (formatMatch) {
+                // Extract type and description from the formatted response
+                const extractedType = formatMatch[1].trim();
+                description = formatMatch[2].trim();
+
+                // Normalize the type to ensure exact match with our categories
+                if (/^tops?$/i.test(extractedType)) clothingType = 'Tops';
+                else if (/^bottoms?$/i.test(extractedType))
+                    clothingType = 'Bottoms';
+                else if (/^outerwear$/i.test(extractedType))
+                    clothingType = 'Outerwear';
+                else if (/^footwear$/i.test(extractedType))
+                    clothingType = 'Footwear';
+                else clothingType = 'Other';
+            } else {
+                // If we can't find the expected format, try to infer type and use rest as description
+                const typeKeywords = {
+                    Tops: [
+                        'shirt',
+                        'blouse',
+                        't-shirt',
+                        'top',
+                        'sweater',
+                        'tee',
+                        'tank',
+                    ],
+                    Bottoms: [
+                        'pants',
+                        'jeans',
+                        'shorts',
+                        'skirt',
+                        'trousers',
+                        'leggings',
+                    ],
+                    Outerwear: [
+                        'jacket',
+                        'coat',
+                        'hoodie',
+                        'cardigan',
+                        'blazer',
+                        'vest',
+                        'parka',
+                    ],
+                    Footwear: [
+                        'shoes',
+                        'boots',
+                        'sneakers',
+                        'sandals',
+                        'heels',
+                        'loafers',
+                    ],
+                };
+
+                let foundType = 'Other';
+                const lowerText = generatedText.toLowerCase();
+
+                // Try to detect type based on keywords
+                for (const [type, keywords] of Object.entries(typeKeywords)) {
+                    if (
+                        keywords.some((keyword) =>
+                            lowerText.includes(keyword.toLowerCase())
+                        )
+                    ) {
+                        foundType = type;
+                        break;
+                    }
+                }
+
+                clothingType = foundType as any;
+                description = generatedText;
             }
         } catch (err) {
-            console.error('Failed to parse GPT-4 response:', visionData);
-            throw new Error(
-                'GPT-4 did not return valid JSON with description and type'
+            console.error(
+                'Failed to parse IDEFICS response:',
+                err,
+                ideficsData
             );
+            // Fallback values
+            description = 'Clothing item';
+            clothingType = 'Other';
         }
 
         // 5. Generate embedding
