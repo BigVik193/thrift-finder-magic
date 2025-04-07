@@ -25,19 +25,19 @@ serve(async (req) => {
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get(
             'SUPABASE_SERVICE_ROLE_KEY'
         );
-        const alpha = 0.3; // Tweak this to control sensitivity
+        const alpha = 0.3;
 
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-            throw new Error('Missing Supabase environment config');
+            throw new Error('Missing Supabase config');
         }
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        const { user_id, new_listing_id } = await req.json();
+        const { user_id, new_listing_id, clothing_item_id } = await req.json();
 
-        if (!user_id || !new_listing_id) {
+        if (!user_id || (!new_listing_id && !clothing_item_id)) {
             return new Response(
                 JSON.stringify({
-                    error: 'user_id and new_listing_id are required',
+                    error: 'user_id and either new_listing_id or clothing_item_id are required',
                 }),
                 {
                     status: 400,
@@ -49,21 +49,33 @@ serve(async (req) => {
             );
         }
 
-        // Fetch new listing embedding
-        const { data: listing, error: listingError } = await supabase
-            .from('listings')
-            .select('embedding')
-            .eq('id', new_listing_id)
-            .single();
+        let embedding: number[] | null = null;
 
-        if (listingError || !listing) {
-            throw new Error('Could not fetch new listing embedding');
+        if (new_listing_id) {
+            const { data: listing, error } = await supabase
+                .from('listings')
+                .select('embedding')
+                .eq('id', new_listing_id)
+                .single();
+            if (error || !listing)
+                throw new Error('Failed to fetch listing embedding');
+            embedding = listing.embedding;
+        } else if (clothing_item_id) {
+            const { data: clothing, error } = await supabase
+                .from('clothing_items')
+                .select('embedding')
+                .eq('id', clothing_item_id)
+                .single();
+            if (error || !clothing)
+                throw new Error('Failed to fetch clothing item embedding');
+            embedding = clothing.embedding;
         }
 
-        const newEmbedding = listing.embedding;
+        if (!embedding) {
+            throw new Error('Embedding not found');
+        }
 
-        // Fetch current user style vector
-        const { data: pref, error: userError } = await supabase
+        const { data: pref, error: prefError } = await supabase
             .from('user_style_preferences')
             .select('style_vector')
             .eq('user_id', user_id)
@@ -71,18 +83,16 @@ serve(async (req) => {
 
         let updatedVector: number[];
 
-        if (!userError && pref && pref.style_vector) {
+        if (!prefError && pref && pref.style_vector) {
             const currentVector = pref.style_vector;
             updatedVector = currentVector.map(
                 (val: number, i: number) =>
-                    alpha * newEmbedding[i] + (1 - alpha) * val
+                    alpha * embedding![i] + (1 - alpha) * val
             );
         } else {
-            // If no current vector exists, use the new one
-            updatedVector = newEmbedding;
+            updatedVector = embedding;
         }
 
-        // Update in DB
         const { error: updateError } = await supabase
             .from('user_style_preferences')
             .update({
@@ -96,7 +106,7 @@ serve(async (req) => {
         }
 
         return new Response(
-            JSON.stringify({ message: 'User style vector updated (EMA)' }),
+            JSON.stringify({ message: 'User style vector updated' }),
             {
                 status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -105,9 +115,7 @@ serve(async (req) => {
     } catch (error) {
         console.error('Error in update-user-style-vector:', error);
         return new Response(
-            JSON.stringify({
-                error: error.message || 'An unknown error occurred',
-            }),
+            JSON.stringify({ error: error.message || 'Unknown error' }),
             {
                 status: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
