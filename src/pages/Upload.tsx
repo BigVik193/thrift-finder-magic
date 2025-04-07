@@ -6,43 +6,92 @@ import { Button } from '@/components/ui/button';
 import { 
   ChevronRight, 
   Info, 
-  CheckCircle2 
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { uploadWardrobeImage, UploadStatus } from '@/services/wardrobeUploadService';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const Upload = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [step, setStep] = useState(1);
-  const [processing, setProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ status: 'idle', progress: 0 });
+  const [uploadResults, setUploadResults] = useState<any[]>([]);
+  const navigate = useNavigate();
   
   const handleFilesAdded = (newFiles: File[]) => {
     setFiles(newFiles);
   };
   
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (files.length === 0) return;
     
     // Move to processing step
     setStep(2);
-    setProcessing(true);
+    setUploadStatus({ status: 'uploading', progress: 0 });
+    setUploadResults([]);
     
-    // Simulate API call and processing
-    setTimeout(() => {
-      setProcessing(false);
-      setCompleted(true);
+    try {
+      // Upload each file sequentially
+      const results = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadStatus({
+          status: 'uploading',
+          progress: (i / files.length) * 50,
+          message: `Uploading item ${i + 1} of ${files.length}...`
+        });
+        
+        const result = await uploadWardrobeImage(file, (status) => {
+          // Normalize progress to the current file's portion of the total
+          const baseProgress = (i / files.length) * 100;
+          const fileProgress = status.progress / files.length;
+          setUploadStatus({
+            ...status,
+            progress: baseProgress + fileProgress
+          });
+        });
+        
+        results.push(result);
+      }
+      
+      setUploadResults(results);
+      
+      // Set complete status
+      setUploadStatus({
+        status: 'success',
+        progress: 100,
+        message: 'All items uploaded successfully!'
+      });
+      
       // Move to completion step after processing
       setTimeout(() => {
         setStep(3);
       }, 1000);
-    }, 3000);
+      
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      setUploadStatus({
+        status: 'error',
+        progress: 0,
+        message: error.message || 'An error occurred during upload'
+      });
+      toast.error('Failed to upload items. Please try again.');
+    }
   };
   
   const resetUpload = () => {
     setFiles([]);
     setStep(1);
-    setProcessing(false);
-    setCompleted(false);
+    setUploadStatus({ status: 'idle', progress: 0 });
+    setUploadResults([]);
+  };
+  
+  const goToWardrobe = () => {
+    navigate('/wardrobe');
   };
 
   return (
@@ -132,17 +181,28 @@ const Upload = () => {
           {/* Step 2: Processing */}
           {step === 2 && (
             <div className="animate-fade-in glass-card p-8 text-center" style={{ animationDelay: '200ms' }}>
-              {processing ? (
+              {uploadStatus.status === 'uploading' || uploadStatus.status === 'processing' ? (
                 <>
-                  <div className="flex justify-center mb-6">
-                    <div className="h-16 w-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="h-16 w-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
+                    <div className="w-full max-w-md">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary transition-all duration-300" 
+                          style={{ width: `${uploadStatus.progress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {uploadStatus.message || 'Processing...'}
+                      </p>
+                    </div>
                   </div>
                   <h2 className="text-xl font-semibold mb-3">Analyzing Your Style</h2>
                   <p className="text-muted-foreground">
-                    Our AI is processing your images to understand your style preferences. This will take just a moment...
+                    Our AI is processing your images to understand your style preferences. This may take a minute...
                   </p>
                 </>
-              ) : (
+              ) : uploadStatus.status === 'success' ? (
                 <>
                   <div className="flex justify-center mb-6">
                     <div className="h-16 w-16 bg-primary/10 text-primary rounded-full flex items-center justify-center">
@@ -153,6 +213,21 @@ const Upload = () => {
                   <p className="text-muted-foreground mb-6">
                     Your style preferences have been analyzed successfully.
                   </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-center mb-6">
+                    <div className="h-16 w-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center">
+                      <AlertCircle className="h-8 w-8" />
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-3">Upload Failed</h2>
+                  <p className="text-muted-foreground mb-6">
+                    {uploadStatus.message || 'There was an error processing your request. Please try again.'}
+                  </p>
+                  <Button variant="outline" onClick={resetUpload}>
+                    Try Again
+                  </Button>
                 </>
               )}
             </div>
@@ -229,8 +304,8 @@ const Upload = () => {
                 >
                   Upload More Photos
                 </Button>
-                <Button>
-                  View Recommendations
+                <Button onClick={goToWardrobe}>
+                  View Your Wardrobe
                 </Button>
               </div>
             </div>

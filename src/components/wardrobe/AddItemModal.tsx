@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { X, Upload, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import { uploadWardrobeImage } from '@/services/wardrobeUploadService';
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -12,13 +12,8 @@ interface AddItemModalProps {
   wardrobeId: string;
 }
 
-export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps) => {
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Tops');
-  const [color, setColor] = useState('');
-  const [material, setMaterial] = useState('');
+export const AddItemModal = ({ isOpen, onClose }: AddItemModalProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [tags, setTags] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const queryClient = useQueryClient();
@@ -32,59 +27,29 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!file || !title || !category) {
-      toast.error('Please fill in all required fields and upload an image.');
+    if (!file) {
+      toast.error('Please upload an image.');
       return;
     }
     
     setLoading(true);
+    setUploadProgress(0);
     
     try {
-      // Upload the image to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${wardrobeId}/${fileName}`;
-      
-      const { error: uploadError, data } = await supabase.storage
-        .from('clothing_images')
-        .upload(filePath, file);
+      // Upload the image using our service
+      await uploadWardrobeImage(file, (status) => {
+        setUploadProgress(status.progress);
         
-      if (uploadError) throw uploadError;
-      
-      // Get the public URL for the uploaded image
-      const { data: { publicUrl } } = supabase.storage
-        .from('clothing_images')
-        .getPublicUrl(filePath);
-      
-      // Create clothing item record
-      const { error: insertError } = await supabase
-        .from('clothing_items')
-        .insert({
-          wardrobe_id: wardrobeId,
-          type: category,
-          color: color || null,
-          material: material || null,
-          image_url: publicUrl,
-          style_matches: tags.split(',').reduce((acc, tag) => {
-            const trimmedTag = tag.trim();
-            if (trimmedTag) acc[trimmedTag] = true;
-            return acc;
-          }, {} as Record<string, boolean>)
-        });
-        
-      if (insertError) throw insertError;
+        if (status.status === 'error') {
+          throw new Error(status.message);
+        }
+      });
       
       toast.success('Item added successfully!');
-      queryClient.invalidateQueries({ queryKey: ['wardrobeItems', wardrobeId] });
+      queryClient.invalidateQueries({ queryKey: ['wardrobeItems'] });
       
       // Reset form
-      setTitle('');
-      setCategory('Tops');
-      setColor('');
-      setMaterial('');
       setFile(null);
-      setTags('');
-      
       onClose();
     } catch (error: any) {
       toast.error(error.message || 'Error adding item');
@@ -105,6 +70,7 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
           <button 
             onClick={onClose}
             className="p-1 hover:bg-muted rounded-full"
+            disabled={loading}
           >
             <X className="h-5 w-5" />
           </button>
@@ -113,80 +79,7 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              Item Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="E.g., Blue Denim Jacket"
-              className="w-full px-3 py-2 border border-border rounded-md"
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Category <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-md"
-              required
-            >
-              <option value="Tops">Tops</option>
-              <option value="Bottoms">Bottoms</option>
-              <option value="Outerwear">Outerwear</option>
-              <option value="Footwear">Footwear</option>
-              <option value="Accessories">Accessories</option>
-            </select>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Color
-              </label>
-              <input
-                type="text"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="E.g., Blue"
-                className="w-full px-3 py-2 border border-border rounded-md"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Material
-              </label>
-              <input
-                type="text"
-                value={material}
-                onChange={(e) => setMaterial(e.target.value)}
-                placeholder="E.g., Denim"
-                className="w-full px-3 py-2 border border-border rounded-md"
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Tags (comma separated)
-            </label>
-            <input
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="E.g., casual, summer, favorite"
-              className="w-full px-3 py-2 border border-border rounded-md"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Image <span className="text-red-500">*</span>
+              Upload an Image <span className="text-red-500">*</span>
             </label>
             <div className="border-2 border-dashed border-border rounded-md p-4">
               {file ? (
@@ -197,6 +90,7 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
                     type="button"
                     onClick={() => setFile(null)}
                     className="ml-auto text-red-500 hover:text-red-700"
+                    disabled={loading}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -206,6 +100,9 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground mb-2">
                     Drag and drop your image here, or click to browse
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4 max-w-xs text-center">
+                    Upload a clear image of a single clothing item for best results. Our AI will analyze it and add it to your wardrobe.
                   </p>
                   <label
                     htmlFor="file-upload"
@@ -219,11 +116,28 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
                     accept="image/*"
                     onChange={handleFileChange}
                     className="hidden"
+                    disabled={loading}
                   />
                 </div>
               )}
             </div>
           </div>
+          
+          {loading && (
+            <div className="space-y-2">
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {uploadProgress < 100
+                  ? "Uploading and analyzing image..."
+                  : "Processing complete!"}
+              </p>
+            </div>
+          )}
           
           <div className="flex justify-end gap-3 pt-4">
             <button
@@ -237,12 +151,12 @@ export const AddItemModal = ({ isOpen, onClose, wardrobeId }: AddItemModalProps)
             <button
               type="submit"
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
-              disabled={loading}
+              disabled={loading || !file}
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Adding...</span>
+                  <span>Processing...</span>
                 </>
               ) : (
                 'Add Item'

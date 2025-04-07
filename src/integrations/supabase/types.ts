@@ -11,35 +11,29 @@ export type Database = {
     Tables: {
       clothing_items: {
         Row: {
-          color: string | null
           created_at: string | null
+          embedding: string | null
           id: string
           image_url: string
-          material: string | null
-          style_matches: Json | null
-          type: string
+          type: Database["public"]["Enums"]["clothing_type_enum"]
           updated_at: string | null
           wardrobe_id: string | null
         }
         Insert: {
-          color?: string | null
           created_at?: string | null
+          embedding?: string | null
           id?: string
           image_url: string
-          material?: string | null
-          style_matches?: Json | null
-          type: string
+          type: Database["public"]["Enums"]["clothing_type_enum"]
           updated_at?: string | null
           wardrobe_id?: string | null
         }
         Update: {
-          color?: string | null
           created_at?: string | null
+          embedding?: string | null
           id?: string
           image_url?: string
-          material?: string | null
-          style_matches?: Json | null
-          type?: string
+          type?: Database["public"]["Enums"]["clothing_type_enum"]
           updated_at?: string | null
           wardrobe_id?: string | null
         }
@@ -203,7 +197,6 @@ export type Database = {
         Row: {
           price_range: Json | null
           sizes: Json | null
-          style_scores: Json | null
           style_vector: string | null
           updated_at: string | null
           user_id: string
@@ -211,7 +204,6 @@ export type Database = {
         Insert: {
           price_range?: Json | null
           sizes?: Json | null
-          style_scores?: Json | null
           style_vector?: string | null
           updated_at?: string | null
           user_id: string
@@ -219,7 +211,6 @@ export type Database = {
         Update: {
           price_range?: Json | null
           sizes?: Json | null
-          style_scores?: Json | null
           style_vector?: string | null
           updated_at?: string | null
           user_id?: string
@@ -493,6 +484,12 @@ export type Database = {
       }
     }
     Enums: {
+      clothing_type_enum:
+        | "Tops"
+        | "Bottoms"
+        | "Outerwear"
+        | "Footwear"
+        | "Other"
       gender_enum: "Male" | "Female" | "Other"
       platform_enum: "eBay" | "Etsy" | "Depop" | "Grailed" | "ThredUp"
     }

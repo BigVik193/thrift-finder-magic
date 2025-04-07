@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '@/components/layout/Navbar';
 import { WardrobeGrid } from '@/components/ui/WardrobeGrid';
@@ -9,8 +10,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { 
   PlusCircle, 
   Filter, 
-  Shirt,
   ShirtIcon,
+  Shirt,
   Footprints,
   Glasses,
   ChevronDown,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { getOrCreateWardrobe, getClothingItems, deleteClothingItem, ClothingItem } from '@/services/wardrobeService';
+import { getWardrobeItems, deleteWardrobeItem } from '@/services/wardrobeUploadService';
 import { getRecommendedItems } from '@/services/listingService';
 
 interface CategoryTabProps {
@@ -59,44 +60,6 @@ const CategoryTab: React.FC<CategoryTabProps> = ({
   );
 };
 
-const recommendedItems = [
-  {
-    id: 'r1',
-    title: 'Vintage Denim Jacket',
-    image: 'https://images.unsplash.com/photo-1601333144130-8cbb312386b6?q=80&w=1974&auto=format&fit=crop',
-    price: '$78',
-    platform: 'Depop',
-    size: 'M',
-    condition: 'Good'
-  },
-  {
-    id: 'r2',
-    title: 'Checkered Wool Blazer',
-    image: 'https://images.unsplash.com/photo-1578932750294-f5075e85f44a?q=80&w=1974&auto=format&fit=crop',
-    price: '$95',
-    platform: 'Etsy',
-    size: 'L',
-    condition: 'Excellent'
-  },
-  {
-    id: 'r3',
-    title: 'Floral Summer Dress',
-    image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=1946&auto=format&fit=crop',
-    price: '$45',
-    platform: 'Poshmark',
-    size: 'S',
-    condition: 'Like New'
-  },
-  {
-    id: 'r4',
-    title: 'Leather Messenger Bag',
-    image: 'https://images.unsplash.com/photo-1548863227-3af567fc3b27?q=80&w=1974&auto=format&fit=crop',
-    price: '$120',
-    platform: 'eBay',
-    condition: 'Vintage'
-  },
-];
-
 const Wardrobe = () => {
   const { user, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState('All');
@@ -104,19 +67,18 @@ const Wardrobe = () => {
   const [fadeIn, setFadeIn] = useState(false);
   const queryClient = useQueryClient();
   
-  const wardrobeQuery = useQuery({
-    queryKey: ['wardrobe'],
-    queryFn: getOrCreateWardrobe
+  // Fetch wardrobe items
+  const { data: wardrobeItems = [], isLoading, error } = useQuery({
+    queryKey: ['wardrobeItems'],
+    queryFn: getWardrobeItems,
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to fetch wardrobe items');
+    }
   });
   
-  const itemsQuery = useQuery({
-    queryKey: ['wardrobeItems', wardrobeQuery.data?.id],
-    queryFn: () => getClothingItems(wardrobeQuery.data?.id || ''),
-    enabled: !!wardrobeQuery.data?.id
-  });
-  
+  // Delete item mutation
   const deleteMutation = useMutation({
-    mutationFn: (itemId: string) => deleteClothingItem(itemId),
+    mutationFn: (itemId: string) => deleteWardrobeItem(itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wardrobeItems'] });
       toast.success('Item deleted successfully');
@@ -127,12 +89,12 @@ const Wardrobe = () => {
   });
   
   const handleDeleteItem = (id: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
+    if (window.confirm('Are you sure you want to delete this item?')) {
       deleteMutation.mutate(id);
     }
   };
   
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setFadeIn(true);
     }, 300);
@@ -140,65 +102,79 @@ const Wardrobe = () => {
     return () => clearTimeout(timer);
   }, []);
   
+  // Filter items based on active category
   const filteredItems = React.useMemo(() => {
-    if (!itemsQuery.data) return [];
+    if (!wardrobeItems) return [];
     
     return activeCategory === 'All'
-      ? itemsQuery.data
-      : itemsQuery.data.filter(item => item.type === activeCategory);
-  }, [itemsQuery.data, activeCategory]);
+      ? wardrobeItems
+      : wardrobeItems.filter(item => item.type === activeCategory);
+  }, [wardrobeItems, activeCategory]);
   
-  const wardrobeItems = React.useMemo(() => {
-    return filteredItems.map((item: ClothingItem) => ({
+  // Format items for the WardrobeGrid component
+  const formattedItems = React.useMemo(() => {
+    return filteredItems.map(item => ({
       id: item.id,
-      title: `${item.color || ''} ${item.material || ''} ${item.type}`.trim(),
+      title: item.type, // We could enhance this with more data if available
       image: item.image_url,
       category: item.type,
-      tags: Object.keys(item.style_matches || {})
+      tags: [] // Add tags if they become available in the data model
     }));
   }, [filteredItems]);
   
+  // Count items by category
   const countByCategory = React.useMemo(() => {
-    if (!itemsQuery.data) return { All: 0, Tops: 0, Bottoms: 0, Outerwear: 0, Footwear: 0, Accessories: 0 };
+    if (!wardrobeItems.length) return { All: 0, Tops: 0, Bottoms: 0, Outerwear: 0, Footwear: 0, Other: 0 };
     
     const counts = {
-      All: itemsQuery.data.length,
+      All: wardrobeItems.length,
       Tops: 0,
       Bottoms: 0,
       Outerwear: 0,
       Footwear: 0,
-      Accessories: 0
+      Other: 0
     };
     
-    itemsQuery.data.forEach((item: ClothingItem) => {
+    wardrobeItems.forEach(item => {
       if (counts[item.type as keyof typeof counts] !== undefined) {
         counts[item.type as keyof typeof counts]++;
+      } else {
+        counts.Other++;
       }
     });
     
     return counts;
-  }, [itemsQuery.data]);
+  }, [wardrobeItems]);
   
   const handleAddItem = () => {
     setIsAddingItem(true);
   };
 
-  const saveRecommendedItem = (id: string) => {
-    console.log("Saving recommended item:", id);
-    // In a real app, this would save to user's favorites
-    toast.success('Item saved to favorites');
-  };
-  
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
     { icon: Shirt, label: 'Tops', count: countByCategory.Tops },
     { icon: ShirtIcon, label: 'Bottoms', count: countByCategory.Bottoms },
     { icon: ShirtIcon, label: 'Outerwear', count: countByCategory.Outerwear },
     { icon: Footprints, label: 'Footwear', count: countByCategory.Footwear },
-    { icon: Glasses, label: 'Accessories', count: countByCategory.Accessories },
+    { icon: Glasses, label: 'Other', count: countByCategory.Other },
   ];
   
-  const isLoading = wardrobeQuery.isLoading || itemsQuery.isLoading;
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-24 px-4 container-custom text-center">
+          <h2 className="text-xl font-semibold mb-4">Error Loading Wardrobe</h2>
+          <p className="text-muted-foreground mb-6">
+            {error instanceof Error ? error.message : 'An unknown error occurred'}
+          </p>
+          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['wardrobeItems'] })}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -288,7 +264,7 @@ const Wardrobe = () => {
                 </div>
                 
                 <WardrobeGrid 
-                  items={wardrobeItems} 
+                  items={formattedItems} 
                   onAddItem={handleAddItem}
                   onDeleteItem={handleDeleteItem}
                   className={cn(
@@ -330,11 +306,11 @@ const Wardrobe = () => {
         </div>
       </main>
       
-      {isAddingItem && wardrobeQuery.data && (
+      {isAddingItem && (
         <AddItemModal 
           isOpen={isAddingItem} 
           onClose={() => setIsAddingItem(false)} 
-          wardrobeId={wardrobeQuery.data.id}
+          wardrobeId=""  // This will be fetched within the modal
         />
       )}
     </div>
