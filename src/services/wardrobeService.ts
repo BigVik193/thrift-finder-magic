@@ -1,15 +1,14 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
 
 export interface ClothingItem {
   id: string;
   type: string;
-  color: string | null;
-  material: string | null;
   image_url: string;
-  style_matches: Record<string, boolean>;
   created_at: string;
+  updated_at: string | null;
+  embedding: string | null;
+  wardrobe_id: string;
 }
 
 export interface Wardrobe {
@@ -73,16 +72,8 @@ export const getClothingItems = async (wardrobeId: string): Promise<ClothingItem
     
   if (error) throw error;
   
-  // Ensure style_matches is correctly typed
-  return data?.map(item => ({
-    id: item.id,
-    type: item.type,
-    color: item.color,
-    material: item.material,
-    image_url: item.image_url,
-    created_at: item.created_at,
-    style_matches: item.style_matches as Record<string, boolean> || {}
-  })) || [];
+  // Return the data directly since it matches our ClothingItem interface now
+  return data || [];
 };
 
 export const deleteClothingItem = async (itemId: string): Promise<void> => {

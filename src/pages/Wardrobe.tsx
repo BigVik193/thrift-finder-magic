@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '@/components/layout/Navbar';
@@ -67,18 +66,19 @@ const Wardrobe = () => {
   const [fadeIn, setFadeIn] = useState(false);
   const queryClient = useQueryClient();
   
-  // Fetch wardrobe items - FIX HERE: Proper onError handling in TanStack Query v5
   const { data: wardrobeItems = [], isLoading, error } = useQuery({
     queryKey: ['wardrobeItems'],
     queryFn: getWardrobeItems,
-    onSettled: (_, error: any) => {
-      if (error) {
+    onSuccess: () => {
+      // Success handling if needed
+    },
+    meta: {
+      onError: (error: any) => {
         toast.error(error.message || 'Failed to fetch wardrobe items');
       }
     }
   });
   
-  // Delete item mutation
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => deleteWardrobeItem(itemId),
     onSuccess: () => {
@@ -104,7 +104,6 @@ const Wardrobe = () => {
     return () => clearTimeout(timer);
   }, []);
   
-  // Filter items based on active category
   const filteredItems = React.useMemo(() => {
     if (!wardrobeItems) return [];
     
@@ -113,18 +112,16 @@ const Wardrobe = () => {
       : wardrobeItems.filter(item => item.type === activeCategory);
   }, [wardrobeItems, activeCategory]);
   
-  // Format items for the WardrobeGrid component
   const formattedItems = React.useMemo(() => {
     return filteredItems.map(item => ({
       id: item.id,
-      title: item.type, // We could enhance this with more data if available
+      title: item.type,
       image: item.image_url,
       category: item.type,
-      tags: [] // Add tags if they become available in the data model
+      tags: []
     }));
   }, [filteredItems]);
   
-  // Count items by category
   const countByCategory = React.useMemo(() => {
     if (!wardrobeItems.length) return { All: 0, Tops: 0, Bottoms: 0, Outerwear: 0, Footwear: 0, Other: 0 };
     
@@ -287,7 +284,6 @@ const Wardrobe = () => {
                   </div>
                 )}
                 
-                {/* Recommendation Carousel */}
                 {filteredItems.length > 0 && (
                   <div className="mt-16">
                     <RecommendationCarousel
@@ -312,7 +308,7 @@ const Wardrobe = () => {
         <AddItemModal 
           isOpen={isAddingItem} 
           onClose={() => setIsAddingItem(false)} 
-          wardrobeId=""  // This will be fetched within the modal
+          wardrobeId="" 
         />
       )}
     </div>
