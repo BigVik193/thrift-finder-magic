@@ -75,23 +75,38 @@ serve(async (req) => {
             throw new Error('Embedding not found');
         }
 
-        const { data: pref, error: prefError } = await supabase
+        let { data: pref, error: prefError } = await supabase
             .from('user_style_preferences')
             .select('style_vector')
             .eq('user_id', user_id)
             .single();
 
-        let updatedVector: number[];
+        let currentVector: number[];
 
-        if (!prefError && pref && pref.style_vector) {
-            const currentVector = pref.style_vector;
-            updatedVector = currentVector.map(
-                (val: number, i: number) =>
-                    alpha * embedding![i] + (1 - alpha) * val
-            );
+        if (!prefError && pref?.style_vector) {
+            currentVector = pref.style_vector;
         } else {
-            updatedVector = embedding;
+            // Initialize with a zero vector
+            currentVector = Array(1536).fill(0);
+
+            // Upsert the zero vector as a starting point
+            const { error: insertError } = await supabase
+                .from('user_style_preferences')
+                .upsert({
+                    user_id,
+                    style_vector: currentVector,
+                    updated_at: new Date().toISOString(),
+                });
+
+            if (insertError) {
+                throw new Error('Failed to create initial zero vector');
+            }
         }
+
+        const updatedVector = currentVector.map(
+            (val: number, i: number) =>
+                alpha * embedding![i] + (1 - alpha) * val
+        );
 
         const { error: updateError } = await supabase
             .from('user_style_preferences')

@@ -57,7 +57,33 @@ serve(async (req) => {
             throw new Error('User style vector not found');
         }
 
-        const userVector = userPref.style_vector;
+        let userVector: number[] = userPref?.style_vector;
+
+        if (!userVector) {
+            userVector = Array(1536).fill(0);
+
+            const { error: insertError } = await supabase
+                .from('user_style_preferences')
+                .upsert({
+                    user_id,
+                    style_vector: userVector,
+                    updated_at: new Date().toISOString(),
+                });
+
+            if (insertError) {
+                throw new Error('Failed to create zero vector');
+            }
+        }
+
+        // Check if userVector is all zeros
+        const isZeroVector = userVector.every((val) => val === 0);
+
+        if (isZeroVector) {
+            return new Response(JSON.stringify({ results: [] }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
 
         // 2. Get IDs of already saved items
         const { data: savedItems } = await supabase
