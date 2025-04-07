@@ -67,12 +67,14 @@ const Wardrobe = () => {
   const [fadeIn, setFadeIn] = useState(false);
   const queryClient = useQueryClient();
   
-  // Fetch wardrobe items
+  // Fetch wardrobe items - FIX HERE: Proper onError handling in TanStack Query v5
   const { data: wardrobeItems = [], isLoading, error } = useQuery({
     queryKey: ['wardrobeItems'],
     queryFn: getWardrobeItems,
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to fetch wardrobe items');
+    onSettled: (_, error: any) => {
+      if (error) {
+        toast.error(error.message || 'Failed to fetch wardrobe items');
+      }
     }
   });
   
