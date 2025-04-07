@@ -85,7 +85,7 @@ serve(async (req) => {
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Describe image using GPT-4 Vision
+        // 4. Describe image and classify type using GPT-4 Vision
         const visionRes = await fetch(
             'https://api.openai.com/v1/chat/completions',
             {
@@ -100,7 +100,7 @@ serve(async (req) => {
                         {
                             role: 'system',
                             content:
-                                'You are a fashion expert. Describe the clothing item in this image using detailed, objective language.',
+                                'You are a fashion expert. Describe the clothing item in this image using detailed language and classify it as one of the following types: Tops, Bottoms, Outerwear, Footwear, or Other. Return only a JSON object with two fields: "description" and "type". The "type" must exactly match one of the five values.',
                         },
                         {
                             role: 'user',
@@ -111,7 +111,7 @@ serve(async (req) => {
                                 },
                                 {
                                     type: 'text',
-                                    text: 'Please describe this item for use in a fashion embedding system.',
+                                    text: 'Please describe the clothing item for use in a fashion embedding system and return the JSON.',
                                 },
                             ],
                         },
@@ -127,7 +127,34 @@ serve(async (req) => {
             throw new Error('Failed to get clothing description from GPT-4');
         }
 
-        const description = visionData.choices[0].message.content;
+        let description: string;
+        let clothingType:
+            | 'Tops'
+            | 'Bottoms'
+            | 'Outerwear'
+            | 'Footwear'
+            | 'Other';
+
+        try {
+            const content = visionData.choices[0].message.content.trim();
+            const parsed = JSON.parse(content);
+
+            description = parsed.description;
+            clothingType = parsed.type;
+
+            if (
+                !['Tops', 'Bottoms', 'Outerwear', 'Footwear', 'Other'].includes(
+                    clothingType
+                )
+            ) {
+                throw new Error(`Invalid clothing type: ${clothingType}`);
+            }
+        } catch (err) {
+            console.error('Failed to parse GPT-4 response:', visionData);
+            throw new Error(
+                'GPT-4 did not return valid JSON with description and type'
+            );
+        }
 
         // 5. Generate embedding
         const embeddingRes = await fetch(
@@ -160,6 +187,7 @@ serve(async (req) => {
                 wardrobe_id: wardrobeId,
                 image_url: imageUrl,
                 embedding,
+                type: clothingType,
             })
             .select('*')
             .maybeSingle();
@@ -170,6 +198,7 @@ serve(async (req) => {
             );
         }
 
+        // 7. Update user style vector
         try {
             const { error: vectorUpdateError } =
                 await supabase.functions.invoke('update-user-style-vector', {
@@ -189,13 +218,13 @@ serve(async (req) => {
             console.error('Failed to invoke update-user-style-vector:', err);
         }
 
-
         return new Response(
             JSON.stringify({
                 success: true,
                 wardrobeId,
                 imageUrl,
                 description,
+                type: clothingType,
                 embedding,
                 clothingItem,
             }),
