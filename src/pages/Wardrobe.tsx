@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '@/components/layout/Navbar';
@@ -69,15 +70,14 @@ const Wardrobe = () => {
   const { data: wardrobeItems = [], isLoading, error } = useQuery({
     queryKey: ['wardrobeItems'],
     queryFn: getWardrobeItems,
-    onSuccess: () => {
-      // Success handling if needed
-    },
-    meta: {
-      onError: (error: any) => {
-        toast.error(error.message || 'Failed to fetch wardrobe items');
-      }
-    }
   });
+  
+  // Show error toast if the query fails
+  useEffect(() => {
+    if (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch wardrobe items');
+    }
+  }, [error]);
   
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => deleteWardrobeItem(itemId),
