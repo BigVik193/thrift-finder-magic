@@ -132,7 +132,7 @@ export const isItemSaved = async (listingId: string): Promise<boolean> => {
 };
 
 // Get popular items based on saves
-export const getPopularItems = async (limit = 5): Promise<Listing[]> => {
+export const getPopularItems = async (limit = 10): Promise<Listing[]> => {
   try {
     // Get top saved items by counting them (without using groupBy which is not available)
     const { data: savedItems, error: countError } = await supabase
@@ -172,7 +172,7 @@ export const getPopularItems = async (limit = 5): Promise<Listing[]> => {
 };
 
 // Get recommended items using the recommendation edge function
-export const getRecommendedItems = async (limit = 5): Promise<Listing[]> => {
+export const getRecommendedItems = async (limit = 10): Promise<Listing[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     

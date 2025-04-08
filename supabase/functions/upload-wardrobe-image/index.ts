@@ -88,17 +88,29 @@ serve(async (req) => {
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Call Flask server with base64 image directly
-        const ideficsResponse = await fetch(`${FLASK_SERVER_URL}/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'ngrok-skip-browser-warning': 'true',
-            },
-            body: JSON.stringify({
-                image_base64: imageBase64,
-            }),
-        });
+        // 4. Call Flask server with base64 image directly - FIX: Use the correct endpoint path
+        const ideficsResponse = await fetch(
+            `${FLASK_SERVER_URL}/api/test/generate`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image_base64: imageBase64,
+                }),
+            }
+        );
+
+        // Error handling for non-JSON responses
+        const contentType = ideficsResponse.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const responseText = await ideficsResponse.text();
+            console.error('Non-JSON response from Flask server:', responseText);
+            throw new Error(
+                `Flask server returned non-JSON response: ${ideficsResponse.status} ${ideficsResponse.statusText}`
+            );
+        }
 
         const ideficsData = await ideficsResponse.json();
 
