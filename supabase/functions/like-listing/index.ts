@@ -91,24 +91,24 @@ serve(async (req) => {
         }
 
         if (userId) {
-            const { data: existingSave } = await supabase
-                .from('saved_items')
+            const { data: existingLike } = await supabase
+                .from('liked_items')
                 .select('user_id, listing_id')
                 .eq('user_id', userId)
                 .eq('listing_id', item.id)
                 .maybeSingle();
 
-            if (!existingSave) {
-                const { error: saveError } = await supabase
-                    .from('saved_items')
+            if (!existingLike) {
+                const { error: likeError } = await supabase
+                    .from('liked_items')
                     .insert({
                         user_id: userId,
                         listing_id: item.id,
                     });
 
-                if (saveError) {
+                if (likeError) {
                     throw new Error(
-                        `Error saving item for user: ${saveError.message}`
+                        `Error liking item for user: ${likeError.message}`
                     );
                 }
 
@@ -137,7 +137,7 @@ serve(async (req) => {
             JSON.stringify({
                 success: true,
                 message: userId
-                    ? 'Item saved successfully'
+                    ? 'Item liked successfully'
                     : 'Item recorded successfully',
             }),
             {
