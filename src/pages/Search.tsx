@@ -1,307 +1,221 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { 
-  Search as SearchIcon, 
-  Filter, 
-  X, 
-  Loader2, 
-  ChevronRight, 
-  ChevronDown, 
-  Sparkles,
-  BookX
-} from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { ItemCard } from '@/components/ui/ItemCard';
+import { Button } from '@/components/ui/button';
 import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
+import { 
+  Filter, 
+  Grid, 
+  List,
+  ChevronDown,
+  X,
+  Sparkles,
+  Loader2
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { searchListings, getRecommendedItems, getPopularItems, likeItemForUser } from '@/services/listingService';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { 
+  saveListing, 
+  getPopularItems, 
+  getRecommendedItems 
+} from '@/services/listingService';
 
-// Platforms for filtering
-const platforms = [
-  { id: 'ebay', name: 'eBay' },
-  { id: 'depop', name: 'Depop' },
-  { id: 'etsy', name: 'Etsy' },
-  { id: 'thredup', name: 'ThredUp' },
-  { id: 'grailed', name: 'Grailed' }
-];
-
-// Sorting options
-const sortOptions = [
-  { id: 'relevance', name: 'Relevance' },
-  { id: 'price-asc', name: 'Price: Low to High' },
-  { id: 'price-desc', name: 'Price: High to Low' },
-  { id: 'newest', name: 'Newest First' }
-];
-
-// Conditions for filtering
-const conditions = [
-  { id: 'new', name: 'New' },
-  { id: 'likenew', name: 'Like New' },
-  { id: 'good', name: 'Good' },
-  { id: 'fair', name: 'Fair' }
-];
-
-// Types of clothing items
-const itemTypes = [
-  { id: 'tops', name: 'Tops' },
-  { id: 'bottoms', name: 'Bottoms' },
-  { id: 'dresses', name: 'Dresses' },
-  { id: 'outerwear', name: 'Outerwear' },
-  { id: 'shoes', name: 'Shoes' },
-  { id: 'accessories', name: 'Accessories' }
-];
+// Convert a database listing to a display item
+const formatListingForDisplay = (listing: any) => ({
+  id: listing.id,
+  title: listing.title,
+  price: `$${listing.price}`,
+  image: listing.image,
+  platform: listing.platform,
+  condition: listing.condition,
+  seller_username: listing.seller_username,
+  size: '',
+  url: listing.url
+});
 
 const Search = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialQuery = searchParams.get('q') || '';
-  
-  const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [results, setResults] = useState<any[]>([]);
+  const { session } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 200]);
-  const [sortBy, setSortBy] = useState('relevance');
-  const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [results, setResults] = useState<any[]>([]);
+  const [animateIn, setAnimateIn] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
   const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
   const [isLoadingPopular, setIsLoadingPopular] = useState(false);
   const [recommendedItems, setRecommendedItems] = useState<any[]>([]);
   const [popularItems, setPopularItems] = useState<any[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [fadeIn, setFadeIn] = useState(false);
   
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFadeIn(true);
+      setAnimateIn(true);
     }, 300);
     
-    if (initialQuery) {
-      handleSearch(initialQuery);
-    } else {
-      loadRecommendedItems();
-      loadPopularItems();
-    }
-    
     return () => clearTimeout(timer);
-  }, [initialQuery]);
+  }, []);
   
-  const loadRecommendedItems = async () => {
-    setIsLoadingRecommended(true);
-    try {
-      const items = await getRecommendedItems(8);
+  // Load popular and recommended items
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoadingRecommended(true);
+      setIsLoadingPopular(true);
       
-      // Format items for display
-      const formattedItems = items.map(item => ({
-        id: item.id,
-        title: item.title,
-        image: item.image,
-        price: `${item.currency} ${item.price}`,
-        platform: item.platform,
-        condition: item.condition
-      }));
-      
-      setRecommendedItems(formattedItems);
-    } catch (error) {
-      console.error('Error loading recommended items:', error);
-    } finally {
-      setIsLoadingRecommended(false);
-    }
-  };
-  
-  const loadPopularItems = async () => {
-    setIsLoadingPopular(true);
-    try {
-      const items = await getPopularItems(8);
-      
-      // Format items for display
-      const formattedItems = items.map(item => ({
-        id: item.id,
-        title: item.title,
-        image: item.image,
-        price: `${item.currency} ${item.price}`,
-        platform: item.platform,
-        condition: item.condition
-      }));
-      
-      setPopularItems(formattedItems);
-    } catch (error) {
-      console.error('Error loading popular items:', error);
-    } finally {
-      setIsLoadingPopular(false);
-    }
-  };
+      try {
+        // Get recommended items
+        const recommended = await getRecommendedItems(5);
+        setRecommendedItems(recommended.map(formatListingForDisplay));
+        
+        // Get popular items
+        const popular = await getPopularItems(5);
+        setPopularItems(popular.map(formatListingForDisplay));
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoadingRecommended(false);
+        setIsLoadingPopular(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
   
   const handleSearch = async (query: string) => {
-    if (!query.trim()) return;
-    
-    setIsLoading(true);
-    setHasSearched(true);
+    if (!query.trim()) {
+      setAiRecommendations([]);
+      setResults([]);
+      setSubmittedQuery('');
+      return;
+    }
+
+    setSubmittedQuery(query);
+    setIsSearching(true);
     
     try {
-      setSearchParams({ q: query });
+      const userGender = session?.user?.user_metadata?.gender || 'unspecified';
       
-      const searchResults = await searchListings(query, 20);
+      // Save the search query for the user if logged in
+      if (session?.user) {
+        await supabase
+          .from('user_searches')
+          .insert({ user_id: session.user.id, query });
+      }
       
-      // Format results for display
-      const formattedResults = searchResults.map(item => ({
-        id: item.id,
-        title: item.title,
-        image: item.image,
-        price: `${item.currency} ${item.price}`,
-        platform: item.platform,
-        condition: item.condition
-      }));
+      const { data, error } = await supabase.functions.invoke('thrift-search', {
+        body: { userQuery: query, userGender }
+      });
       
-      setResults(formattedResults);
+      if (error) {
+        throw error;
+      }
+      
+      if (data.status === 'success' && data.recommended_searches && data.recommended_searches.length > 0) {
+        setAiRecommendations(data.recommended_searches);
+        
+        await searchEbay(data.recommended_searches);
+      } else {
+        setAiRecommendations([]);
+        setResults([]);
+        console.log('No recommended searches found or invalid response format:', data);
+      }
     } catch (error) {
-      console.error('Error searching listings:', error);
+      console.error('Error fetching AI recommendations:', error);
+      toast.error('Error getting search recommendations');
+      setAiRecommendations([]);
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
+    }
+  };
+
+  const searchEbay = async (searchTerms: string[]) => {
+    if (!searchTerms || searchTerms.length === 0) return;
+    
+    setIsLoadingResults(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ebay-search', {
+        body: { searchTerms }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.items && Array.isArray(data.items)) {
+        const transformedItems = data.items.map((item: any) => {
+          // Save the listing to the database
+          const dbItem = {
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            currency: item.currency,
+            image: item.image,
+            platform: item.platform,
+            seller_username: item.seller_username || 'Unknown Seller',
+            seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+            seller_feedback_score: item.seller_feedback_score || 0,
+            condition: item.condition || 'Not specified',
+            url: item.url || ''
+          };
+          
+          // Save to database without waiting (fire and forget)
+          saveListing(dbItem);
+          
+          return formatListingForDisplay(dbItem);
+        });
+        
+        setResults(transformedItems);
+        setHasMoreResults(data.items.length >= 10);
+      } else {
+        setResults([]);
+        console.log('No eBay results found');
+      }
+    } catch (error) {
+      console.error('Error searching eBay:', error);
+      toast.error('Error fetching results from eBay');
+    } finally {
+      setIsLoadingResults(false);
     }
   };
   
-  const resetFilters = () => {
-    setSelectedPlatforms([]);
-    setSelectedConditions([]);
-    setSelectedTypes([]);
-    setPriceRange([0, 200]);
-    setSortBy('relevance');
+  const useRecommendedSearch = (recommendedQuery: string) => {
+    setSearchQuery(recommendedQuery);
+    handleSearch(recommendedQuery);
   };
   
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearch(searchQuery);
-    }
-  };
-  
-  const togglePlatform = (platformId: string) => {
-    if (selectedPlatforms.includes(platformId)) {
-      setSelectedPlatforms(selectedPlatforms.filter(id => id !== platformId));
+  const toggleFilter = (filter: string) => {
+    if (activeFilters.includes(filter)) {
+      setActiveFilters(activeFilters.filter(f => f !== filter));
     } else {
-      setSelectedPlatforms([...selectedPlatforms, platformId]);
+      setActiveFilters([...activeFilters, filter]);
     }
   };
   
-  const toggleCondition = (conditionId: string) => {
-    if (selectedConditions.includes(conditionId)) {
-      setSelectedConditions(selectedConditions.filter(id => id !== conditionId));
-    } else {
-      setSelectedConditions([...selectedConditions, conditionId]);
-    }
+  const clearFilters = () => {
+    setActiveFilters([]);
   };
   
-  const toggleType = (typeId: string) => {
-    if (selectedTypes.includes(typeId)) {
-      setSelectedTypes(selectedTypes.filter(id => id !== typeId));
-    } else {
-      setSelectedTypes([...selectedTypes, typeId]);
-    }
+  const handleSaveItem = async (id: string, isSaved: boolean) => {
+    // Note: The actual saving is now handled in the ItemCard component
+    // This function is for any additional UI updates after saving
+    console.log(`Item ${id} is now ${isSaved ? 'saved' : 'unsaved'}`);
   };
-  
-  const handleLikeItem = async (id: string, isLiked: boolean) => {
-    // This function handles when a user likes/unlikes an item
-    console.log(`Item ${id} ${isLiked ? 'liked' : 'unliked'}`);
+
+  const loadMoreResults = () => {
+    setPage(prev => prev + 1);
+    setHasMoreResults(false);
   };
-  
-  // Filter section markup
-  const filterSection = (
-    <div className="space-y-6">
-      <div>
-        <h4 className="font-medium mb-3">Price Range</h4>
-        <div className="px-2">
-          <Slider 
-            defaultValue={priceRange}
-            max={200}
-            step={1}
-            minStepsBetweenThumbs={1}
-            onValueChange={(value) => setPriceRange(value as [number, number])}
-            className="mb-6"
-          />
-          <div className="flex justify-between">
-            <span className="text-sm">${priceRange[0]}</span>
-            <span className="text-sm">${priceRange[1]}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div>
-        <h4 className="font-medium mb-3">Platforms</h4>
-        <div className="space-y-2">
-          {platforms.map((platform) => (
-            <div key={platform.id} className="flex items-center">
-              <Checkbox 
-                id={`platform-${platform.id}`}
-                checked={selectedPlatforms.includes(platform.id)}
-                onCheckedChange={() => togglePlatform(platform.id)}
-                className="mr-2"
-              />
-              <label htmlFor={`platform-${platform.id}`} className="text-sm">
-                {platform.name}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div>
-        <h4 className="font-medium mb-3">Condition</h4>
-        <div className="space-y-2">
-          {conditions.map((condition) => (
-            <div key={condition.id} className="flex items-center">
-              <Checkbox 
-                id={`condition-${condition.id}`}
-                checked={selectedConditions.includes(condition.id)}
-                onCheckedChange={() => toggleCondition(condition.id)}
-                className="mr-2"
-              />
-              <label htmlFor={`condition-${condition.id}`} className="text-sm">
-                {condition.name}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div>
-        <h4 className="font-medium mb-3">Item Type</h4>
-        <div className="space-y-2">
-          {itemTypes.map((type) => (
-            <div key={type.id} className="flex items-center">
-              <Checkbox 
-                id={`type-${type.id}`}
-                checked={selectedTypes.includes(type.id)}
-                onCheckedChange={() => toggleType(type.id)}
-                className="mr-2"
-              />
-              <label htmlFor={`type-${type.id}`} className="text-sm">
-                {type.name}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="pt-4">
-        <Button 
-          onClick={resetFilters}
-          variant="outline" 
-          className="w-full mb-2"
-        >
-          Reset Filters
-        </Button>
-        <Button className="w-full">
-          Apply Filters
-        </Button>
-      </div>
-    </div>
-  );
+
+  const showSearchResults = submittedQuery.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -309,248 +223,308 @@ const Search = () => {
       
       <main className="pt-24 px-4 pb-20">
         <div className="container-custom">
-          {/* Search Bar */}
-          <div className="mb-8 animate-fade-in">
-            <div className="max-w-3xl mx-auto">
-              <div className="relative">
-                <Input 
-                  type="text"
-                  placeholder="Search for vintage tees, Y2K jeans, retro jackets..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  className="pr-24 h-12"
-                />
-                {searchQuery && (
-                  <button 
-                    className="absolute right-20 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+          <div className="mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6 animate-fade-in">
+              Discover Thrift Finds
+            </h1>
+            
+            <div className="relative animate-fade-in" style={{ animationDelay: '100ms' }}>
+              <SearchInput 
+                placeholder="Try 'vintage leather jacket' or 'Y2K baggy jeans'..." 
+                onSearch={handleSearch}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              
+              <div className="absolute right-3 top-3 flex gap-1">
                 <Button 
-                  className="absolute right-0 top-0 h-full rounded-l-none gap-2"
-                  onClick={() => handleSearch(searchQuery)}
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  className="rounded-full h-6 w-6"
                 >
-                  <SearchIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline">Search</span>
+                  {viewMode === 'grid' ? (
+                    <List className="h-4 w-4" />
+                  ) : (
+                    <Grid className="h-4 w-4" />
+                  )}
                 </Button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 justify-center">
-                <span className="text-sm text-muted-foreground">Try:</span>
-                {['vintage denim jacket', 'y2k tops', 'leather boots'].map((suggestion, index) => (
-                  <button 
-                    key={index}
-                    className="text-sm px-3 py-1 rounded-full bg-secondary hover:bg-secondary/70 transition-colors"
-                    onClick={() => {
-                      setSearchQuery(suggestion);
-                      handleSearch(suggestion);
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
               </div>
             </div>
           </div>
           
-          {hasSearched ? (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Mobile Filter Toggle */}
-              <div className="lg:hidden">
-                <Button 
-                  variant="outline" 
-                  className="w-full mb-4 gap-2"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                >
-                  <Filter className="h-4 w-4" />
-                  <span>{isFilterOpen ? 'Hide Filters' : 'Show Filters'}</span>
-                  <ChevronDown className={cn(
-                    "h-4 w-4 transition-transform",
-                    isFilterOpen ? "rotate-180" : ""
-                  )} />
-                </Button>
-                
-                {/* Mobile Filters */}
-                {isFilterOpen && (
-                  <div className="bg-muted/30 p-4 rounded-lg mb-6">
-                    {filterSection}
-                  </div>
-                )}
-              </div>
-              
-              {/* Desktop Filters */}
-              <div className="hidden lg:block">
-                <div className="sticky top-24">
-                  <div className="bg-muted/30 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold mb-6 flex items-center">
-                      <Filter className="h-5 w-5 mr-2" />
-                      <span>Filters</span>
-                    </h3>
-                    
-                    {filterSection}
+          {submittedQuery && aiRecommendations.length > 0 && (
+            <div className="mb-6 bg-primary/5 rounded-lg p-4 flex flex-col items-start gap-3 animate-fade-in" style={{ animationDelay: '150ms' }}>
+              <div className="flex items-start gap-3 w-full">
+                <div className="bg-primary/10 p-1.5 rounded-full">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-1">AI Enhanced Search</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    We've optimized your search for better results. Try these specific queries:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiRecommendations.map((recommendation, index) => (
+                      <button
+                        key={index}
+                        onClick={() => useRecommendedSearch(recommendation)}
+                        className="bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm hover:bg-primary/20 transition-colors"
+                      >
+                        {recommendation}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+          
+          {(isSearching || isLoadingResults) && submittedQuery && (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2 text-muted-foreground">
+                {isSearching ? 'Optimizing your search...' : 'Finding thrift treasures...'}
+              </span>
+            </div>
+          )}
+          
+          {!showSearchResults && (
+            <div className="space-y-12 mb-12 animate-fade-in" style={{ animationDelay: '150ms' }}>
+              <RecommendationCarousel
+                title="Recommended For You"
+                description="Based on your style preferences and past saves"
+                items={recommendedItems}
+                onSaveItem={handleSaveItem}
+                isLoading={isLoadingRecommended}
+                emptyMessage="Start saving items to get personalized recommendations!"
+              />
               
-              {/* Search Results */}
-              <div className="lg:col-span-3">
-                {initialQuery && (
-                  <h2 className="text-2xl font-bold mb-4">
-                    Search results for "{initialQuery}"
-                  </h2>
+              <RecommendationCarousel
+                title="Popular Right Now"
+                description="Trending items that match your style"
+                items={popularItems}
+                onSaveItem={handleSaveItem}
+                isLoading={isLoadingPopular}
+                emptyMessage="No popular items to show yet. Check back soon!"
+              />
+            </div>
+          )}
+          
+          {showSearchResults && !isSearching && !isLoadingResults && (
+            <>
+              <div className="mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Filters</span>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 transition-transform",
+                      isFilterOpen ? "transform rotate-180" : ""
+                    )} />
+                  </Button>
+                  
+                  {activeFilters.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearFilters}
+                      className="text-muted-foreground hover:text-foreground gap-1"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Clear filters</span>
+                    </Button>
+                  )}
+                </div>
+                
+                {activeFilters.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {activeFilters.map(filter => (
+                      <div 
+                        key={filter}
+                        className="bg-secondary rounded-full px-3 py-1 text-sm flex items-center gap-1"
+                      >
+                        <span>{filter}</span>
+                        <button onClick={() => toggleFilter(filter)}>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 
-                {/* Results Sorting */}
-                <div className="flex justify-between items-center mb-6">
-                  <div className="text-sm text-muted-foreground">
-                    {isLoading ? 'Searching...' : results.length > 0 ? `${results.length} items found` : 'No items found'}
+                {isFilterOpen && (
+                  <div className="bg-muted/30 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Platform</h3>
+                      <div className="space-y-1">
+                        {["All Platforms", "Depop", "eBay", "ThredUp", "Etsy", "Poshmark", "Grailed"].map(platform => (
+                          <button 
+                            key={platform}
+                            onClick={() => toggleFilter(platform)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(platform) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {platform}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Category</h3>
+                      <div className="space-y-1">
+                        {["All Categories", "Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Shoes"].map(category => (
+                          <button 
+                            key={category}
+                            onClick={() => toggleFilter(category)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(category) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Condition</h3>
+                      <div className="space-y-1">
+                        {["Any Condition", "New", "Like New", "Good", "Fair"].map(condition => (
+                          <button 
+                            key={condition}
+                            onClick={() => toggleFilter(condition)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(condition) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {condition}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-medium mb-2 text-sm">Price Range</h3>
+                      <div className="space-y-1">
+                        {["Any Price", "Under $25", "$25-$50", "$50-$100", "Over $100"].map(range => (
+                          <button 
+                            key={range}
+                            onClick={() => toggleFilter(range)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                              activeFilters.includes(range) 
+                                ? "bg-primary/10 text-primary" 
+                                : "hover:bg-muted"
+                            )}
+                          >
+                            {range}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
+                )}
+              </div>
+              
+              <div className="mb-6 animate-fade-in" style={{ animationDelay: '250ms' }}>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-muted-foreground">
+                    {results.length} items found
+                  </p>
                   
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Sort by:</span>
-                    <select 
-                      className="bg-muted/50 border border-border rounded px-2 py-1 text-sm appearance-none pr-8"
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                    >
-                      {sortOptions.map(option => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
+                    <select className="bg-muted/50 border border-border rounded px-2 py-1 text-sm">
+                      <option>Relevance</option>
+                      <option>Price: Low to High</option>
+                      <option>Price: High to Low</option>
+                      <option>Newest</option>
                     </select>
-                    <ChevronDown className="h-4 w-4 -ml-6 pointer-events-none text-muted-foreground" />
                   </div>
                 </div>
                 
-                {isLoading ? (
-                  <div className="flex justify-center items-center py-20">
-                    <div className="flex flex-col items-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                      <p className="text-muted-foreground">Searching for thrift finds...</p>
-                    </div>
-                  </div>
-                ) : results.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {results.map((item, index) => (
+                <div className={cn(
+                  viewMode === 'grid' 
+                    ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" 
+                    : "space-y-4"
+                )}>
+                  {results.length > 0 ? (
+                    results.map((item, index) => (
                       <div 
                         key={item.id}
                         className={cn(
-                          fadeIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+                          animateIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
                           "transition-all duration-500"
                         )}
                         style={{ transitionDelay: `${index * 50}ms` }}
                       >
-                        <ItemCard 
-                          item={item} 
-                          onLike={handleLikeItem}
-                        />
+                        {viewMode === 'grid' ? (
+                          <ItemCard 
+                            item={item} 
+                            onSave={handleSaveItem}
+                          />
+                        ) : (
+                          <div className="flex gap-4 p-4 border border-border rounded-lg">
+                            <div className="w-24 h-24 bg-muted rounded-md overflow-hidden">
+                              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium">{item.title}</h3>
+                              <p className="text-muted-foreground text-sm mb-1">
+                                {item.platform} • {item.condition} • {item.size || 'N/A'}
+                              </p>
+                              <p className="font-semibold">{item.price}</p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleSaveItem(item.id, true)}
+                              className="h-10 px-3"
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ) : !isLoading && hasSearched ? (
-                  <div className="text-center py-12 bg-muted/30 rounded-xl">
-                    <BookX className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No items found</h3>
-                    <p className="text-muted-foreground max-w-md mx-auto mb-4">
-                      We couldn't find any items matching your search. Try broadening your search terms or exploring our recommendations below.
-                    </p>
-                    <Button onClick={() => {
-                      setHasSearched(false);
-                      setSearchQuery('');
-                      setSearchParams({});
-                    }}>
-                      View Recommendations
-                    </Button>
-                  </div>
-                ) : null}
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-10">
+                      <p className="text-muted-foreground">No items found. Try a different search.</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className={cn(
-              "animate-in fade-in-50",
-              "space-y-12"
-            )}>
-              {/* Recommended Items */}
-              <RecommendationCarousel
-                title="Recommended For You"
-                description="Items we think you'll love based on your style"
-                items={recommendedItems}
-                onLikeItem={handleLikeItem}
-                isLoading={isLoadingRecommended}
-                emptyMessage="Like a few items to get personalized recommendations!"
-              />
               
-              {/* Popular Items */}
-              <RecommendationCarousel
-                title="Popular Items"
-                description="Trending thrift finds that others are loving"
-                items={popularItems}
-                onLikeItem={handleLikeItem}
-                isLoading={isLoadingPopular}
-                emptyMessage="Come back soon to see what's trending!"
-              />
-              
-              {/* Browse by Category */}
-              <section>
-                <h2 className="text-2xl font-bold mb-6">
-                  Browse by Category
-                </h2>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {itemTypes.map((type) => (
-                    <button
-                      key={type.id}
-                      className="glass-card p-4 h-32 flex flex-col items-center justify-center text-center transition-all duration-300 hover:shadow-hover hover:-translate-y-1"
-                      onClick={() => {
-                        setSearchQuery(type.name);
-                        handleSearch(type.name);
-                      }}
-                    >
-                      <h3 className="text-lg font-semibold">{type.name}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Explore {type.name.toLowerCase()}
-                      </p>
-                      <ChevronRight className="h-4 w-4 mt-2 text-primary" />
-                    </button>
-                  ))}
+              {results.length > 0 && (
+                <div className="flex justify-center mt-8 animate-fade-in" style={{ animationDelay: '300ms' }}>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={loadMoreResults}
+                    disabled={!hasMoreResults}
+                  >
+                    {hasMoreResults ? 'Load More Results' : 'No More Results'}
+                  </Button>
                 </div>
-              </section>
-              
-              {/* Trending Searches */}
-              <section className="glass-card p-6">
-                <h2 className="text-xl font-semibold mb-4">
-                  Trending Searches
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {[
-                    "vintage denim jacket",
-                    "y2k tops",
-                    "chunky loafers",
-                    "baggy cargo pants",
-                    "90s band tees",
-                    "leather blazers",
-                    "pleated skirts",
-                    "platform boots"
-                  ].map((term, index) => (
-                    <button 
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
-                      onClick={() => {
-                        setSearchQuery(term);
-                        handleSearch(term);
-                      }}
-                    >
-                      <span>{term}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </div>
+              )}
+            </>
           )}
         </div>
       </main>
