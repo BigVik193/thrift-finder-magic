@@ -75,6 +75,30 @@ serve(async (req) => {
             throw new Error('Embedding not found');
         }
 
+        // Ensure embedding is an array
+        if (!Array.isArray(embedding)) {
+            console.log('Converting embedding to array:', typeof embedding);
+            try {
+                // If it's a JSON string, parse it
+                if (typeof embedding === 'string') {
+                    embedding = JSON.parse(embedding);
+                } else {
+                    // If it's an object with numeric keys, convert to array
+                    embedding = Object.values(embedding);
+                }
+
+                // Verify it's now an array
+                if (!Array.isArray(embedding)) {
+                    throw new Error(
+                        `Embedding is not in expected format: ${typeof embedding}`
+                    );
+                }
+            } catch (err) {
+                console.error('Failed to convert embedding to array:', err);
+                throw new Error('Embedding format error');
+            }
+        }
+
         let { data: pref, error: prefError } = await supabase
             .from('user_style_preferences')
             .select('style_vector')
@@ -84,10 +108,45 @@ serve(async (req) => {
         let currentVector: number[];
 
         if (!prefError && pref?.style_vector) {
-            currentVector = pref.style_vector;
+            // Make sure currentVector is properly converted to an array
+            let vectorData = pref.style_vector;
+
+            if (!Array.isArray(vectorData)) {
+                console.log(
+                    'Converting style_vector to array:',
+                    typeof vectorData
+                );
+                try {
+                    // If it's a JSON string, parse it
+                    if (typeof vectorData === 'string') {
+                        vectorData = JSON.parse(vectorData);
+                    }
+                    // If it's an object with numeric keys, convert to array
+                    if (
+                        typeof vectorData === 'object' &&
+                        !Array.isArray(vectorData)
+                    ) {
+                        vectorData = Object.values(vectorData);
+                    }
+                } catch (err) {
+                    console.error('Failed to parse style_vector:', err);
+                    // Fall back to zero vector if parsing fails
+                    vectorData = Array(embedding.length).fill(0);
+                }
+            }
+
+            currentVector = vectorData;
+
+            // Final safety check
+            if (!Array.isArray(currentVector)) {
+                console.warn(
+                    `currentVector is still not an array after conversion: ${typeof currentVector}`
+                );
+                currentVector = Array(embedding.length).fill(0);
+            }
         } else {
-            // Initialize with a zero vector
-            currentVector = Array(1536).fill(0);
+            // Initialize with a zero vector matching embedding dimensions
+            currentVector = Array(embedding.length).fill(0);
 
             // Upsert the zero vector as a starting point
             const { error: insertError } = await supabase
@@ -103,9 +162,27 @@ serve(async (req) => {
             }
         }
 
+        // Log for debugging
+        console.log(
+            'Current vector type:',
+            typeof currentVector,
+            'isArray:',
+            Array.isArray(currentVector),
+            'length:',
+            currentVector.length
+        );
+        console.log(
+            'Embedding type:',
+            typeof embedding,
+            'isArray:',
+            Array.isArray(embedding),
+            'length:',
+            embedding.length
+        );
+
+        // Now that we've ensured both are arrays, we can safely use map
         const updatedVector = currentVector.map(
-            (val: number, i: number) =>
-                alpha * embedding![i] + (1 - alpha) * val
+            (val: number, i: number) => alpha * embedding[i] + (1 - alpha) * val
         );
 
         const { error: updateError } = await supabase

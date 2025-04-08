@@ -10,7 +10,7 @@ const NavLinks = [
   { name: 'Search', path: '/search', icon: <Search className="h-5 w-5" /> },
   { name: 'Upload', path: '/upload', icon: <Upload className="h-5 w-5" /> },
   { name: 'Wardrobe', path: '/wardrobe', icon: <GridIcon className="h-5 w-5" /> },
-  { name: 'Saved', path: '/saved', icon: <Heart className="h-5 w-5" /> },
+  { name: 'Liked', path: '/liked', icon: <Heart className="h-5 w-5" /> },
 ];
 
 export const Navbar = () => {
