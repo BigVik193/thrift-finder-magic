@@ -53,10 +53,26 @@ serve(async (req) => {
             .eq('user_id', user_id)
             .maybeSingle();
 
-        let userVector: number[] | null = userPref?.style_vector || null;
+        let userVector: number[];
 
-        if (!userVector) {
-            // Insert a zero vector if none exists
+        if (userPref?.style_vector) {
+            try {
+                const styleVector = userPref.style_vector;
+
+                if (Array.isArray(styleVector)) {
+                    userVector = styleVector.map(Number);
+                } else if (typeof styleVector === 'string') {
+                    userVector = JSON.parse(styleVector).map(Number);
+                } else if (typeof styleVector === 'object') {
+                    userVector = Object.values(styleVector).map(Number);
+                } else {
+                    userVector = Array(1536).fill(0);
+                }
+            } catch (e) {
+                console.error('Error parsing vector:', e);
+                userVector = Array(1536).fill(0);
+            }
+        } else {
             userVector = Array(1536).fill(0);
 
             const { error: insertError } = await supabase
@@ -71,15 +87,17 @@ serve(async (req) => {
                 throw new Error('Failed to create zero vector');
             }
 
-            // Return empty results since it's a zero vector
             return new Response(JSON.stringify({ results: [] }), {
                 status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
 
-        // Check if userVector is all zeros
-        const isZeroVector = userVector.every((val) => val === 0);
+        // 2. Check if userVector is a zero vector
+        const isZeroVector =
+            userVector.length > 0 &&
+            userVector.every((val) => val === 0 || val === '0');
+
         if (isZeroVector) {
             return new Response(JSON.stringify({ results: [] }), {
                 status: 200,
@@ -87,7 +105,7 @@ serve(async (req) => {
             });
         }
 
-        // 2. Get IDs of already saved items
+        // 3. Get saved listing IDs to exclude
         const { data: savedItems } = await supabase
             .from('saved_items')
             .select('listing_id')
@@ -95,7 +113,7 @@ serve(async (req) => {
 
         const savedIds = (savedItems || []).map((item) => item.listing_id);
 
-        // 3. Run similarity query via RPC (server-side SQL)
+        // 4. Run similarity query via RPC
         const { data: recommendations, error: simError } = await supabase.rpc(
             'get_similar_listings',
             {
@@ -116,9 +134,7 @@ serve(async (req) => {
     } catch (error) {
         console.error('get-recommendations error:', error);
         return new Response(
-            JSON.stringify({
-                error: error.message || 'Unexpected error',
-            }),
+            JSON.stringify({ error: error.message || 'Unexpected error' }),
             {
                 status: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
