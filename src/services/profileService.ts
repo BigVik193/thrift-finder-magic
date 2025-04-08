@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -144,15 +145,45 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (!user) return [];
     
-    // Get liked items activity
-    const { data: likedItems, error: likedError } = await supabase
+    // Get liked items activity - fixed query to properly fetch listing titles
+    const { data: likedData, error: likedError } = await supabase
       .from('liked_items')
-      .select('listing_id, saved_at, listings(title)')
+      .select('listing_id, saved_at')
       .eq('user_id', user.id)
       .order('saved_at', { ascending: false })
       .limit(limit);
     
     if (likedError) throw likedError;
+    
+    // Create an array to store activity with listing titles
+    const likedActivity: RecentActivity[] = [];
+    
+    // If we have liked items, fetch their titles from the listings table separately
+    if (likedData && likedData.length > 0) {
+      // Get the listing IDs from liked items
+      const listingIds = likedData.map(item => item.listing_id);
+      
+      // Fetch the corresponding listings
+      const { data: listingsData, error: listingsError } = await supabase
+        .from('listings')
+        .select('id, title')
+        .in('id', listingIds);
+      
+      if (listingsError) throw listingsError;
+      
+      // Create activity entries with titles from listings
+      for (const likedItem of likedData) {
+        const listing = listingsData?.find(l => l.id === likedItem.listing_id);
+        if (listing) {
+          likedActivity.push({
+            id: likedItem.listing_id,
+            type: 'liked',
+            text: `You liked "${listing.title || 'an item'}"`,
+            time: format(new Date(likedItem.saved_at), 'MMM d, h:mm a')
+          });
+        }
+      }
+    }
     
     // Get search activity
     const { data: searches, error: searchError } = await supabase
@@ -164,14 +195,7 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (searchError) throw searchError;
     
-    // Combine and format activities
-    const likedActivity = (likedItems || []).map(item => ({
-      id: item.listing_id,
-      type: 'liked' as const,
-      text: `You liked "${item.listings?.title || 'an item'}"`,
-      time: format(new Date(item.saved_at), 'MMM d, h:mm a')
-    }));
-    
+    // Format search activities
     const searchActivity = (searches || []).map(search => ({
       id: search.id,
       type: 'search' as const,
