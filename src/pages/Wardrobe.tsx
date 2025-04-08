@@ -285,14 +285,11 @@ const Wardrobe = () => {
                 {filteredItems.length > 0 && (
                   <div className="mt-16">
                     <RecommendationCarousel
-                      title="Recommended For Your Wardrobe"
-                      description="Items that would complement your current wardrobe"
-                      fetchItems={() => getRecommendedItems(4)}
-                      onSaveItem={(id, isSaved) => {
-                        console.log("Saving recommended item:", id, isSaved);
-                        toast.success(isSaved ? 'Item saved to your collection' : 'Item removed from your collection');
-                      }}
-                      emptyMessage="We're still learning your style. Save a few items to start seeing recommendations!"
+                      title="Recommended For Your Style"
+                      description="Items that match your wardrobe aesthetic"
+                      fetchItems={() => getRecommendedItems(8)}
+                      onLikeItem={(id, isLiked) => console.log(`Item ${id} ${isLiked ? 'liked' : 'unliked'}`)}
+                      emptyMessage="Add more items to your wardrobe to get personalized recommendations!"
                     />
                   </div>
                 )}

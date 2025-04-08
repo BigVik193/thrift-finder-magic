@@ -11,7 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getUserSavedItems, saveItemForUser } from '@/services/listingService';
+import { getUserLikedItems, likeItemForUser } from '@/services/listingService';
 import { useAuth } from '@/hooks/useAuth';
 
 const SavedItems = () => {
@@ -28,20 +28,20 @@ const SavedItems = () => {
       setFadeIn(true);
     }, 300);
     
-    // Load saved items
-    loadSavedItems();
+    // Load liked items
+    loadLikedItems();
     
     return () => clearTimeout(timer);
   }, [user]);
   
-  const loadSavedItems = async () => {
+  const loadLikedItems = async () => {
     setIsLoading(true);
     try {
       if (user) {
-        const savedItems = await getUserSavedItems();
+        const likedItems = await getUserLikedItems();
         
         // Format items for display
-        const formattedItems = savedItems.map(item => ({
+        const formattedItems = likedItems.map(item => ({
           id: item.id,
           title: item.title,
           image: item.image,
@@ -55,7 +55,7 @@ const SavedItems = () => {
         setItems(formattedItems);
       }
     } catch (error) {
-      console.error('Error loading saved items:', error);
+      console.error('Error loading liked items:', error);
     } finally {
       setIsLoading(false);
     }
@@ -78,9 +78,9 @@ const SavedItems = () => {
   };
   
   const handleDelete = async () => {
-    // Unsave all selected items
+    // Unlike all selected items
     for (const id of selectedItems) {
-      await saveItemForUser(id); // This toggles the saved status
+      await likeItemForUser(id); // This toggles the liked status
     }
     
     // Update the UI
@@ -90,8 +90,8 @@ const SavedItems = () => {
   };
   
   const removeItem = async (id: string) => {
-    // Unsave the item
-    await saveItemForUser(id);
+    // Unlike the item
+    await likeItemForUser(id);
     // Update the UI
     setItems(items.filter(item => item.id !== id));
   };
@@ -105,7 +105,7 @@ const SavedItems = () => {
           <div className="mb-8 animate-fade-in">
             <div className="flex items-center justify-between">
               <h1 className="text-3xl md:text-4xl font-bold">
-                Saved Items
+                Liked Items
               </h1>
               
               <div className="flex gap-2">
@@ -150,7 +150,7 @@ const SavedItems = () => {
               </div>
             </div>
             <p className="text-muted-foreground text-lg mt-3">
-              Browse and manage your saved thrift finds.
+              Browse and manage your liked thrift finds.
             </p>
           </div>
           
@@ -225,19 +225,19 @@ const SavedItems = () => {
             </div>
           )}
           
-          {/* Saved Items Section */}
+          {/* Liked Items Section */}
           {isLoading ? (
             <div className="flex justify-center items-center py-20">
               <div className="flex flex-col items-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Loading your saved items...</p>
+                <p className="text-muted-foreground">Loading your liked items...</p>
               </div>
             </div>
           ) : items.length > 0 ? (
             <div className="mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-muted-foreground">
-                  {items.length} {items.length === 1 ? 'item' : 'items'} saved
+                  {items.length} {items.length === 1 ? 'item' : 'items'} liked
                 </p>
                 
                 <div className="flex items-center gap-2">
@@ -281,8 +281,8 @@ const SavedItems = () => {
                     
                     <ItemCard 
                       item={item} 
-                      saved={true}
-                      onSave={() => removeItem(item.id)}
+                      liked={true}
+                      onLike={() => removeItem(item.id)}
                     />
                     
                     <div className="mt-2 flex justify-between items-center">
@@ -306,9 +306,9 @@ const SavedItems = () => {
             </div>
           ) : (
             <div className="text-center py-20 bg-muted/30 rounded-xl animate-fade-in">
-              <h2 className="text-xl font-semibold mb-3">No saved items yet</h2>
+              <h2 className="text-xl font-semibold mb-3">No liked items yet</h2>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Items you save while browsing thrift finds will appear here for easy access.
+                Items you like while browsing thrift finds will appear here for easy access.
               </p>
               <Button onClick={() => window.location.href = "/search"}>
                 Browse Thrift Finds
@@ -324,7 +324,7 @@ const SavedItems = () => {
                   Running out of space?
                 </h3>
                 <p className="text-muted-foreground">
-                  Upgrade to Trove Premium for unlimited saved items and price drop alerts.
+                  Upgrade to Trove Premium for unlimited liked items and price drop alerts.
                 </p>
               </div>
               <Button variant="outline" className="shrink-0">
