@@ -1,4 +1,21 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
+// Define the Listing type
+export interface Listing {
+  id: string;
+  title: string;
+  price: string;
+  currency: string;
+  image: string;
+  platform: string;
+  seller_username: string;
+  seller_feedback_percentage: string;
+  seller_feedback_score: number;
+  condition: string;
+  url: string;
+}
+
 // Check if item is liked by user
 export const isItemLiked = async (listingId: string): Promise<boolean> => {
   try {
@@ -13,9 +30,36 @@ export const isItemLiked = async (listingId: string): Promise<boolean> => {
       .eq('user_id', user.id)
       .eq('listing_id', listingId);
     
+    if (error) throw error;
+    
     return count ? count > 0 : false;
   } catch (error) {
     console.error('Error checking if item is liked:', error);
+    return false;
+  }
+};
+
+// Like/unlike an item for a user
+export const likeItemForUser = async (itemId: string): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('User not authenticated');
+      return false;
+    }
+    
+    // Call the like-listing edge function
+    const { data, error } = await supabase.functions.invoke('like-listing', {
+      body: { item: { id: itemId }, userId: user.id }
+    });
+    
+    if (error) throw error;
+    
+    // Return true if the item was liked, false if unliked
+    return await isItemLiked(itemId);
+  } catch (error) {
+    console.error('Error liking item:', error);
     return false;
   }
 };
@@ -105,5 +149,44 @@ export const getUserLikedItems = async (limit?: number): Promise<Listing[]> => {
   } catch (error) {
     console.error('Error getting user liked items:', error);
     return [];
+  }
+};
+
+// Search listings based on query
+export const searchListings = async (query: string, limit = 20): Promise<Listing[]> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('thrift-search', {
+      body: { query, limit }
+    });
+    
+    if (error) throw error;
+    
+    return data?.items || [];
+  } catch (error) {
+    console.error('Error searching listings:', error);
+    return [];
+  }
+};
+
+// Get recommended items for the user
+export const getRecommendedItems = async (limit = 10): Promise<Listing[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // If no user, return popular items instead
+      return getPopularItems(limit);
+    }
+    
+    const { data, error } = await supabase.functions.invoke('get-recommendations', {
+      body: { user_id: user.id, limit }
+    });
+    
+    if (error) throw error;
+    
+    return data?.recommendations || [];
+  } catch (error) {
+    console.error('Error getting recommended items:', error);
+    return getPopularItems(limit); // Fallback to popular items
   }
 };
