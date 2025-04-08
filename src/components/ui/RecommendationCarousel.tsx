@@ -30,6 +30,8 @@ interface RecommendationCarouselProps {
   isLoading?: boolean;
   fetchItems?: () => Promise<Listing[]>;
   emptyMessage?: string;
+  // Add backward compatibility prop aliases
+  onSaveItem?: (id: string, isSaved: boolean) => void;
 }
 
 // Helper function to convert Listing to RecommendationItem
@@ -49,6 +51,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   description,
   items: initialItems,
   onLikeItem,
+  onSaveItem, // For backward compatibility
   className,
   isLoading: initialLoading = false,
   fetchItems,
@@ -57,6 +60,9 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   const [items, setItems] = useState<RecommendationItem[]>(initialItems || []);
   const [isLoading, setIsLoading] = useState(initialLoading);
   const [hasLoadedData, setHasLoadedData] = useState(false);
+
+  // Use onLikeItem if provided, otherwise fall back to onSaveItem for compatibility
+  const handleItemLike = onLikeItem || onSaveItem || (() => {});
 
   useEffect(() => {
     if (initialItems) {
@@ -146,7 +152,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
             <CarouselItem key={item.id} className="pl-2 md:pl-4 sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
               <ItemCard 
                 item={item} 
-                onLike={onLikeItem}
+                onLike={handleItemLike}
               />
             </CarouselItem>
           ))}

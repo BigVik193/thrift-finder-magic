@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { likeItemForUser, isItemLiked } from '@/services/listingService';
+import { isItemLiked, likeItemForUser } from '@/services/listingService';
 
 interface ItemCardProps {
   item: {
