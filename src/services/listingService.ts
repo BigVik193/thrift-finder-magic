@@ -16,43 +16,7 @@ export interface Listing {
     url: string;
 }
 
-// Save a listing to the database
-export const saveListing = async (item: Listing): Promise<boolean> => {
-    try {
-        // Check if listing already exists
-        const { data: existingListing } = await supabase
-            .from('listings')
-            .select('id')
-            .eq('id', item.id)
-            .maybeSingle();
-
-        // If listing doesn't exist, save it
-        if (!existingListing) {
-            const { error } = await supabase.from('listings').insert({
-                id: item.id,
-                title: item.title,
-                price: item.price,
-                currency: item.currency,
-                image: item.image,
-                platform: item.platform,
-                seller_username: item.seller_username,
-                seller_feedback_percentage: item.seller_feedback_percentage,
-                seller_feedback_score: item.seller_feedback_score,
-                condition: item.condition,
-                url: item.url,
-            });
-
-            if (error) throw error;
-        }
-
-        return true;
-    } catch (error) {
-        console.error('Error saving listing:', error);
-        return false;
-    }
-};
-
-// Like an item for a user (renamed from saveItemForUser)
+// Like an item for a user
 export const likeItemForUser = async (listingId: string): Promise<boolean> => {
     try {
         const {
@@ -71,10 +35,17 @@ export const likeItemForUser = async (listingId: string): Promise<boolean> => {
             return false;
         }
 
-        // Use the like-listing edge function instead of direct database operations
+        // Get full item details if we have them
+        const { data: listing } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', listingId)
+            .maybeSingle();
+
+        // Use the like-listing edge function
         const { data, error } = await supabase.functions.invoke('like-listing', {
             body: { 
-                item: { id: listingId },
+                item: listing || { id: listingId },
                 userId: user.id
             },
         });
@@ -98,7 +69,7 @@ export const likeItemForUser = async (listingId: string): Promise<boolean> => {
     }
 };
 
-// Save an item for a user (legacy alias for backward compatibility)
+// Legacy alias for backward compatibility
 export const saveItemForUser = likeItemForUser;
 
 // Check if item is liked by user
@@ -130,7 +101,7 @@ export const isItemSaved = isItemLiked;
 // Get popular items based on likes
 export const getPopularItems = async (limit = 10): Promise<Listing[]> => {
     try {
-        // Get top liked items by counting them (without using groupBy which is not available)
+        // Get top liked items by counting them
         const { data: likedItems, error: countError } = await supabase
             .from('liked_items')
             .select('listing_id, count')
@@ -238,7 +209,7 @@ export const getRecommendedItems = async (limit = 10): Promise<Listing[]> => {
     }
 };
 
-// Get user's liked items (renamed from getUserSavedItems)
+// Get user's liked items
 export const getUserLikedItems = async (limit?: number): Promise<Listing[]> => {
     try {
         const {
@@ -291,7 +262,7 @@ export const getUserLikedItems = async (limit?: number): Promise<Listing[]> => {
 // Legacy alias for backward compatibility
 export const getUserSavedItems = getUserLikedItems;
 
-// Search for listings
+// Search for listings without automatically saving them
 export const searchListings = async (
     query: string,
     limit = 10

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -29,7 +28,7 @@ export type StyleScore = Record<string, number>;
 
 export interface RecentActivity {
   id: string;
-  type: 'saved' | 'search';
+  type: 'liked' | 'search';
   text: string;
   time: string;
 }
@@ -145,15 +144,15 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (!user) return [];
     
-    // Get saved items activity
-    const { data: savedItems, error: savedError } = await supabase
-      .from('saved_items')
+    // Get liked items activity
+    const { data: likedItems, error: likedError } = await supabase
+      .from('liked_items')
       .select('listing_id, saved_at, listings(title)')
       .eq('user_id', user.id)
       .order('saved_at', { ascending: false })
       .limit(limit);
     
-    if (savedError) throw savedError;
+    if (likedError) throw likedError;
     
     // Get search activity
     const { data: searches, error: searchError } = await supabase
@@ -166,10 +165,10 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     if (searchError) throw searchError;
     
     // Combine and format activities
-    const savedActivity = (savedItems || []).map(item => ({
+    const likedActivity = (likedItems || []).map(item => ({
       id: item.listing_id,
-      type: 'saved' as const,
-      text: `You saved "${item.listings?.title || 'an item'}"`,
+      type: 'liked' as const,
+      text: `You liked "${item.listings?.title || 'an item'}"`,
       time: format(new Date(item.saved_at), 'MMM d, h:mm a')
     }));
     
@@ -181,7 +180,7 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     }));
     
     // Combine and sort by time (newest first)
-    const allActivity = [...savedActivity, ...searchActivity]
+    const allActivity = [...likedActivity, ...searchActivity]
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, limit);
     

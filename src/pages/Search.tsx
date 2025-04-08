@@ -18,7 +18,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { 
-  saveListing, 
   getPopularItems, 
   getRecommendedItems,
   likeItemForUser 
@@ -147,7 +146,7 @@ const Search = () => {
       
       if (data.items && Array.isArray(data.items)) {
         const transformedItems = data.items.map((item: any) => {
-          const dbItem = {
+          return formatListingForDisplay({
             id: item.id,
             title: item.title,
             price: item.price,
@@ -159,11 +158,7 @@ const Search = () => {
             seller_feedback_score: item.seller_feedback_score || 0,
             condition: item.condition || 'Not specified',
             url: item.url || ''
-          };
-          
-          saveListing(dbItem);
-          
-          return formatListingForDisplay(dbItem);
+          });
         });
         
         setResults(transformedItems);
@@ -199,6 +194,7 @@ const Search = () => {
   
   const handleLikeItem = async (id: string, isLiked: boolean) => {
     console.log(`Item ${id} is now ${isLiked ? 'liked' : 'unliked'}`);
+    await likeItemForUser(id);
   };
 
   const loadMoreResults = () => {
