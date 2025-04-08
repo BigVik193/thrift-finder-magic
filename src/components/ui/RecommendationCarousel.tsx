@@ -25,7 +25,7 @@ interface RecommendationCarouselProps {
   title: string;
   description?: string;
   items?: RecommendationItem[];
-  onSaveItem?: (id: string, isSaved: boolean) => void;
+  onLikeItem?: (id: string, isLiked: boolean) => void;
   className?: string;
   isLoading?: boolean;
   fetchItems?: () => Promise<Listing[]>;
@@ -48,7 +48,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   title,
   description,
   items: initialItems,
-  onSaveItem,
+  onLikeItem,
   className,
   isLoading: initialLoading = false,
   fetchItems,
@@ -119,7 +119,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
         </div>
         <div className="bg-muted/40 rounded-lg p-6 text-center">
           <p className="text-muted-foreground">
-            {emptyMessage || "We're still learning your style. Save a few items to start seeing recommendations here!"}
+            {emptyMessage || "We're still learning your style. Like a few items to start seeing recommendations here!"}
           </p>
         </div>
       </div>
@@ -146,7 +146,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
             <CarouselItem key={item.id} className="pl-2 md:pl-4 sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
               <ItemCard 
                 item={item} 
-                onSave={onSaveItem}
+                onLike={onLikeItem}
               />
             </CarouselItem>
           ))}

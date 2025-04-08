@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ItemCard } from '@/components/ui/ItemCard';
 import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
 import { cn } from '@/lib/utils';
-import { getUserSavedItems, getRecommendedItems, saveItemForUser } from '@/services/listingService';
+import { getUserLikedItems, getRecommendedItems, likeItemForUser } from '@/services/listingService';
 import { useAuth } from '@/hooks/useAuth';
 
 // Sample data for trending searches 
@@ -29,8 +29,8 @@ const Dashboard = () => {
   const [greeting, setGreeting] = useState('Good day');
   const [animateCards, setAnimateCards] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
-  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [isLoadingLiked, setIsLoadingLiked] = useState(false);
+  const [likedItems, setLikedItems] = useState<any[]>([]);
 
   useEffect(() => {
     // Set greeting based on time of day
@@ -47,18 +47,18 @@ const Dashboard = () => {
     // Load the user's recent searches (placeholder for now)
     setRecentSearches(["vintage denim jacket", "y2k tops", "leather boots size 9"]);
 
-    // Load the user's saved items
+    // Load the user's liked items
     if (user) {
-      loadSavedItems();
+      loadLikedItems();
     }
 
     return () => clearTimeout(timer);
   }, [user]);
 
-  const loadSavedItems = async () => {
-    setIsLoadingSaved(true);
+  const loadLikedItems = async () => {
+    setIsLoadingLiked(true);
     try {
-      const items = await getUserSavedItems(3); // Get most recent 3 saved items
+      const items = await getUserLikedItems(3); // Get most recent 3 liked items
       
       // Format the items for display
       const formattedItems = items.map(item => ({
@@ -70,11 +70,11 @@ const Dashboard = () => {
         condition: item.condition
       }));
       
-      setSavedItems(formattedItems);
+      setLikedItems(formattedItems);
     } catch (error) {
-      console.error('Error loading saved items:', error);
+      console.error('Error loading liked items:', error);
     } finally {
-      setIsLoadingSaved(false);
+      setIsLoadingLiked(false);
     }
   };
 
@@ -84,13 +84,13 @@ const Dashboard = () => {
     window.location.href = `/search?q=${encodeURIComponent(query)}`;
   };
 
-  const handleSaveItem = async (id: string, isSaved: boolean) => {
-    if (!isSaved) {
-      // Remove the item from the savedItems array
-      setSavedItems(prev => prev.filter(item => item.id !== id));
+  const handleLikeItem = async (id: string, isLiked: boolean) => {
+    if (!isLiked) {
+      // Remove the item from the likedItems array
+      setLikedItems(prev => prev.filter(item => item.id !== id));
     } else {
-      // Refresh the saved items list
-      loadSavedItems();
+      // Refresh the liked items list
+      loadLikedItems();
     }
   };
 
@@ -178,7 +178,7 @@ const Dashboard = () => {
               </p>
             </Link>
             
-            <Link to="/saved" className={cn(
+            <Link to="/liked" className={cn(
               "glass-card p-6 flex flex-col items-center text-center transition-all duration-300 hover:shadow-hover hover:-translate-y-1",
               animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
               "transition-all duration-500"
@@ -186,46 +186,46 @@ const Dashboard = () => {
               <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <Heart className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Saved Items</h3>
+              <h3 className="text-lg font-semibold mb-2">Liked Items</h3>
               <p className="text-sm text-muted-foreground">
                 View your favorited thrift finds
               </p>
             </Link>
           </div>
           
-          {/* Saved Items Section */}
+          {/* Liked Items Section */}
           <section className={cn(
             "mb-12",
             animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
             "transition-all duration-500"
           )} style={{ transitionDelay: '350ms' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Recently Saved</h2>
-              <Link to="/saved" className="text-primary flex items-center gap-1 text-sm hover:underline">
+              <h2 className="text-2xl font-bold">Recently Liked</h2>
+              <Link to="/liked" className="text-primary flex items-center gap-1 text-sm hover:underline">
                 <span>View all</span>
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </div>
             
-            {isLoadingSaved ? (
+            {isLoadingLiked ? (
               <div className="flex justify-center items-center py-12">
                 <Loader2 className="h-8 w-8 text-primary animate-spin" />
               </div>
-            ) : savedItems.length > 0 ? (
+            ) : likedItems.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {savedItems.map(item => (
+                {likedItems.map(item => (
                   <ItemCard 
                     key={item.id} 
                     item={item} 
-                    saved={true} 
-                    onSave={handleSaveItem} 
+                    liked={true} 
+                    onLike={handleLikeItem} 
                   />
                 ))}
               </div>
             ) : (
               <div className="bg-muted/40 rounded-lg p-6 text-center">
                 <p className="text-muted-foreground">
-                  You haven't saved any items yet. Start exploring to find thrift treasures!
+                  You haven't liked any items yet. Start exploring to find thrift treasures!
                 </p>
                 <Button className="mt-4" onClick={() => window.location.href = "/search"}>
                   Explore Listings
@@ -244,8 +244,8 @@ const Dashboard = () => {
               title="Recommended For You"
               description="Items we think you'll love based on your style"
               fetchItems={() => getRecommendedItems(4)}
-              onSaveItem={handleSaveItem}
-              emptyMessage="We're still learning your style preferences. Save a few items to get personalized recommendations!"
+              onLikeItem={handleLikeItem}
+              emptyMessage="We're still learning your style preferences. Like a few items to get personalized recommendations!"
             />
           </section>
           

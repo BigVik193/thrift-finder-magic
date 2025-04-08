@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -53,14 +54,14 @@ export const saveListing = async (item: Listing): Promise<boolean> => {
   }
 };
 
-// Save an item for a user
-export const saveItemForUser = async (listingId: string): Promise<boolean> => {
+// Like an item for a user
+export const likeItemForUser = async (listingId: string): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      toast('Please login to save items', {
-        description: 'Create an account to save items to your collection',
+      toast('Please login to like items', {
+        description: 'Create an account to like items to your collection',
         action: {
           label: 'Login',
           onClick: () => window.location.href = '/auth'
@@ -69,56 +70,46 @@ export const saveItemForUser = async (listingId: string): Promise<boolean> => {
       return false;
     }
     
-    // Check if item is already saved by user
-    const { data: existingSave } = await supabase
-      .from('saved_items')
-      .select('user_id, listing_id')
-      .eq('user_id', user.id)
-      .eq('listing_id', listingId)
-      .maybeSingle();
-    
-    if (existingSave) {
-      // Item already saved, so unsave it
-      const { error } = await supabase
-        .from('saved_items')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('listing_id', listingId);
+    try {
+      // Call the like-listing edge function
+      const { data, error } = await supabase.functions.invoke('like-listing', {
+        body: { 
+          item: { id: listingId },
+          userId: user.id
+        }
+      });
       
       if (error) throw error;
       
-      toast.success('Item removed from your saved items');
-      return false; // Return false to indicate item is now unsaved
-    } else {
-      // Save the item
-      const { error } = await supabase
-        .from('saved_items')
-        .insert({
-          user_id: user.id,
-          listing_id: listingId
-        });
+      const isLiked = data?.success && !data?.removed;
       
-      if (error) throw error;
+      if (isLiked) {
+        toast.success('Item liked! Added to your collection');
+      } else {
+        toast.success('Item unliked. Removed from your collection');
+      }
       
-      toast.success('Item saved to your collection');
-      return true; // Return true to indicate item is now saved
+      return isLiked;
+    } catch (error) {
+      console.error('Error invoking like-listing function:', error);
+      throw error;
     }
   } catch (error) {
-    console.error('Error saving item for user:', error);
-    toast.error('Failed to save item');
+    console.error('Error liking item for user:', error);
+    toast.error('Failed to like item');
     return false;
   }
 };
 
-// Check if item is saved by user
-export const isItemSaved = async (listingId: string): Promise<boolean> => {
+// Check if item is liked by user
+export const isItemLiked = async (listingId: string): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) return false;
     
     const { data } = await supabase
-      .from('saved_items')
+      .from('liked_items')
       .select('listing_id')
       .eq('user_id', user.id)
       .eq('listing_id', listingId)
@@ -126,25 +117,25 @@ export const isItemSaved = async (listingId: string): Promise<boolean> => {
     
     return !!data;
   } catch (error) {
-    console.error('Error checking if item is saved:', error);
+    console.error('Error checking if item is liked:', error);
     return false;
   }
 };
 
-// Get popular items based on saves
+// Get popular items based on likes
 export const getPopularItems = async (limit = 10): Promise<Listing[]> => {
   try {
-    // Get top saved items by counting them (without using groupBy which is not available)
-    const { data: savedItems, error: countError } = await supabase
-      .from('saved_items')
+    // Get top liked items by counting them (without using groupBy which is not available)
+    const { data: likedItems, error: countError } = await supabase
+      .from('liked_items')
       .select('listing_id, count')
       .select('listing_id')
       .limit(limit);
     
     if (countError) throw countError;
     
-    // If there are not enough saved items, use random listings
-    if (!savedItems || savedItems.length < limit) {
+    // If there are not enough liked items, use random listings
+    if (!likedItems || likedItems.length < limit) {
       const { data: randomItems, error: randomError } = await supabase
         .from('listings')
         .select('*')
@@ -156,7 +147,7 @@ export const getPopularItems = async (limit = 10): Promise<Listing[]> => {
     }
     
     // Get details for the popular listings
-    const listingIds = savedItems.map(item => item.listing_id);
+    const listingIds = likedItems.map(item => item.listing_id);
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
       .select('*')
@@ -232,16 +223,16 @@ export const getRecommendedItems = async (limit = 10): Promise<Listing[]> => {
   }
 };
 
-// Get user's saved items
-export const getUserSavedItems = async (limit?: number): Promise<Listing[]> => {
+// Get user's liked items
+export const getUserLikedItems = async (limit?: number): Promise<Listing[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) return [];
     
-    // Query to get the user's saved item IDs
+    // Query to get the user's liked item IDs
     const query = supabase
-      .from('saved_items')
+      .from('liked_items')
       .select('listing_id')
       .eq('user_id', user.id)
       .order('saved_at', { ascending: false });
@@ -251,16 +242,16 @@ export const getUserSavedItems = async (limit?: number): Promise<Listing[]> => {
       query.limit(limit);
     }
     
-    const { data: savedItemIds, error: savedError } = await query;
+    const { data: likedItemIds, error: likedError } = await query;
     
-    if (savedError) throw savedError;
+    if (likedError) throw likedError;
     
-    if (!savedItemIds || savedItemIds.length === 0) {
+    if (!likedItemIds || likedItemIds.length === 0) {
       return [];
     }
     
-    // Get the listing details for the saved items
-    const listingIds = savedItemIds.map(item => item.listing_id);
+    // Get the listing details for the liked items
+    const listingIds = likedItemIds.map(item => item.listing_id);
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
       .select('*')
@@ -268,14 +259,14 @@ export const getUserSavedItems = async (limit?: number): Promise<Listing[]> => {
     
     if (listingsError) throw listingsError;
     
-    // Sort listings to maintain order from saved_items
+    // Sort listings to maintain order from liked_items
     const sortedListings = listingIds
       .map(id => listings?.find(listing => listing.id === id))
       .filter(listing => !!listing) as Listing[];
     
     return sortedListings;
   } catch (error) {
-    console.error('Error getting user saved items:', error);
+    console.error('Error getting user liked items:', error);
     return [];
   }
 };

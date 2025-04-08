@@ -47,6 +47,84 @@ export type Database = {
           },
         ]
       }
+      daily_fetch_status: {
+        Row: {
+          batch_id: string
+          completed_at: string | null
+          id: string
+          new_listings_added: number
+          started_at: string | null
+          status: string
+          term_count: number
+          terms_processed: number
+          terms_with_errors: number
+        }
+        Insert: {
+          batch_id: string
+          completed_at?: string | null
+          id?: string
+          new_listings_added?: number
+          started_at?: string | null
+          status?: string
+          term_count?: number
+          terms_processed?: number
+          terms_with_errors?: number
+        }
+        Update: {
+          batch_id?: string
+          completed_at?: string | null
+          id?: string
+          new_listings_added?: number
+          started_at?: string | null
+          status?: string
+          term_count?: number
+          terms_processed?: number
+          terms_with_errors?: number
+        }
+        Relationships: []
+      }
+      daily_search_terms: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_fetched_at: string | null
+          search_term: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_fetched_at?: string | null
+          search_term: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_fetched_at?: string | null
+          search_term?: string
+        }
+        Relationships: []
+      }
+      liked_items: {
+        Row: {
+          listing_id: string
+          saved_at: string | null
+          user_id: string
+        }
+        Insert: {
+          listing_id: string
+          saved_at?: string | null
+          user_id: string
+        }
+        Update: {
+          listing_id?: string
+          saved_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       listings: {
         Row: {
           condition: string

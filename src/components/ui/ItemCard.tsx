@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { saveItemForUser, isItemSaved } from '@/services/listingService';
+import { likeItemForUser, isItemLiked } from '@/services/listingService';
 
 interface ItemCardProps {
   item: {
@@ -15,38 +15,38 @@ interface ItemCardProps {
     condition?: string;
   };
   className?: string;
-  onSave?: (id: string, isSaved: boolean) => void;
-  saved?: boolean;
+  onLike?: (id: string, isLiked: boolean) => void;
+  liked?: boolean;
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({
   item,
   className,
-  onSave,
-  saved: initialSaved = false,
+  onLike,
+  liked: initialLiked = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [isSaved, setIsSaved] = useState(initialSaved);
+  const [isLiked, setIsLiked] = useState(initialLiked);
   const [imageLoaded, setImageLoaded] = useState(false);
   
-  // Check if the item is saved when component mounts
+  // Check if the item is liked when component mounts
   useEffect(() => {
-    const checkSavedStatus = async () => {
-      const savedStatus = await isItemSaved(item.id);
-      setIsSaved(savedStatus);
+    const checkLikedStatus = async () => {
+      const likedStatus = await isItemLiked(item.id);
+      setIsLiked(likedStatus);
     };
     
-    checkSavedStatus();
+    checkLikedStatus();
   }, [item.id]);
   
-  const handleSave = async (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    const newSavedStatus = await saveItemForUser(item.id);
-    setIsSaved(newSavedStatus);
+    const newLikedStatus = await likeItemForUser(item.id);
+    setIsLiked(newLikedStatus);
     
-    if (onSave) onSave(item.id, newSavedStatus);
+    if (onLike) onLike(item.id, newLikedStatus);
   };
 
   return (
@@ -78,14 +78,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         />
         
         <button
-          onClick={handleSave}
+          onClick={handleLike}
           className={cn(
             "absolute top-3 right-3 p-2 rounded-full z-10 transition-all duration-200",
             "bg-background/80 backdrop-blur-sm hover:bg-background shadow-sm",
-            isSaved ? "text-accent" : "text-muted-foreground"
+            isLiked ? "text-accent" : "text-muted-foreground"
           )}
+          title={isLiked ? "Unlike" : "Like"}
         >
-          <Heart className={cn("h-4 w-4", isSaved && "fill-accent")} />
+          <Heart className={cn("h-4 w-4", isLiked && "fill-accent")} />
         </button>
         
         <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-medium">
