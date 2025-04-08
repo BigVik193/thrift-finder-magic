@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -21,10 +20,10 @@ import { toast } from 'sonner';
 import { 
   saveListing, 
   getPopularItems, 
-  getRecommendedItems 
+  getRecommendedItems,
+  likeItemForUser 
 } from '@/services/listingService';
 
-// Convert a database listing to a display item
 const formatListingForDisplay = (listing: any) => ({
   id: listing.id,
   title: listing.title,
@@ -64,18 +63,15 @@ const Search = () => {
     return () => clearTimeout(timer);
   }, []);
   
-  // Load popular and recommended items
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoadingRecommended(true);
       setIsLoadingPopular(true);
       
       try {
-        // Get recommended items
         const recommended = await getRecommendedItems(5);
         setRecommendedItems(recommended.map(formatListingForDisplay));
         
-        // Get popular items
         const popular = await getPopularItems(5);
         setPopularItems(popular.map(formatListingForDisplay));
       } catch (error) {
@@ -103,7 +99,6 @@ const Search = () => {
     try {
       const userGender = session?.user?.user_metadata?.gender || 'unspecified';
       
-      // Save the search query for the user if logged in
       if (session?.user) {
         await supabase
           .from('user_searches')
@@ -152,7 +147,6 @@ const Search = () => {
       
       if (data.items && Array.isArray(data.items)) {
         const transformedItems = data.items.map((item: any) => {
-          // Save the listing to the database
           const dbItem = {
             id: item.id,
             title: item.title,
@@ -167,7 +161,6 @@ const Search = () => {
             url: item.url || ''
           };
           
-          // Save to database without waiting (fire and forget)
           saveListing(dbItem);
           
           return formatListingForDisplay(dbItem);
@@ -204,10 +197,8 @@ const Search = () => {
     setActiveFilters([]);
   };
   
-  const handleSaveItem = async (id: string, isSaved: boolean) => {
-    // Note: The actual saving is now handled in the ItemCard component
-    // This function is for any additional UI updates after saving
-    console.log(`Item ${id} is now ${isSaved ? 'saved' : 'unsaved'}`);
+  const handleLikeItem = async (id: string, isLiked: boolean) => {
+    console.log(`Item ${id} is now ${isLiked ? 'liked' : 'unliked'}`);
   };
 
   const loadMoreResults = () => {
@@ -295,7 +286,7 @@ const Search = () => {
                 title="Recommended For You"
                 description="Based on your style preferences and past saves"
                 items={recommendedItems}
-                onSaveItem={handleSaveItem}
+                onLike={handleLikeItem}
                 isLoading={isLoadingRecommended}
                 emptyMessage="Start saving items to get personalized recommendations!"
               />
@@ -304,7 +295,7 @@ const Search = () => {
                 title="Popular Right Now"
                 description="Trending items that match your style"
                 items={popularItems}
-                onSaveItem={handleSaveItem}
+                onLike={handleLikeItem}
                 isLoading={isLoadingPopular}
                 emptyMessage="No popular items to show yet. Check back soon!"
               />
@@ -478,7 +469,7 @@ const Search = () => {
                         {viewMode === 'grid' ? (
                           <ItemCard 
                             item={item} 
-                            onSave={handleSaveItem}
+                            onLike={handleLikeItem}
                           />
                         ) : (
                           <div className="flex gap-4 p-4 border border-border rounded-lg">
@@ -495,10 +486,10 @@ const Search = () => {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              onClick={() => handleSaveItem(item.id, true)}
+                              onClick={() => likeItemForUser(item.id)}
                               className="h-10 px-3"
                             >
-                              Save
+                              Like
                             </Button>
                           </div>
                         )}

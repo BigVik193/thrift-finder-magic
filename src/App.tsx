@@ -15,6 +15,7 @@ import Search from "./pages/Search";
 import Upload from "./pages/Upload";
 import Wardrobe from "./pages/Wardrobe";
 import SavedItems from "./pages/SavedItems";
+import LikedItems from "./pages/LikedItems";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
             <Route path="/wardrobe" element={<ProtectedRoute><Wardrobe /></ProtectedRoute>} />
             <Route path="/saved" element={<ProtectedRoute><SavedItems /></ProtectedRoute>} />
+            <Route path="/liked" element={<ProtectedRoute><LikedItems /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             
             {/* Public search page */}
