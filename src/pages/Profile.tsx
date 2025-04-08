@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
@@ -258,7 +257,7 @@ const Profile = () => {
                             className="flex items-start gap-3 p-2 hover:bg-muted/50 rounded-lg transition-colors"
                           >
                             <div className="shrink-0 bg-secondary p-2 rounded-full">
-                              {activity.type === 'saved' && <Heart className="h-4 w-4 text-primary" />}
+                              {activity.type === 'liked' && <Heart className="h-4 w-4 text-primary" />}
                               {activity.type === 'search' && <Search className="h-4 w-4 text-primary" />}
                             </div>
                             <div className="flex-1">
