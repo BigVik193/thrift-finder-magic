@@ -32,6 +32,8 @@ interface RecommendationCarouselProps {
   emptyMessage?: string;
   // Add backward compatibility prop aliases
   onSaveItem?: (id: string, isSaved: boolean) => void;
+  // Add the missing onLikeItem prop that's being used in Dashboard and Wardrobe
+  onLikeItem?: (id: string, isLiked: boolean) => void;
 }
 
 // Helper function to convert Listing to RecommendationItem
@@ -52,6 +54,7 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   items: initialItems,
   onLike,
   onSaveItem, // For backward compatibility
+  onLikeItem, // Add the missing prop in destructuring
   className,
   isLoading: initialLoading = false,
   fetchItems,
@@ -61,8 +64,8 @@ export const RecommendationCarousel: React.FC<RecommendationCarouselProps> = ({
   const [isLoading, setIsLoading] = useState(initialLoading);
   const [hasLoadedData, setHasLoadedData] = useState(false);
 
-  // Use onLike if provided, otherwise fall back to onSaveItem for compatibility
-  const handleItemLike = onLike || onSaveItem || (() => {});
+  // Use onLike if provided, otherwise fall back to onLikeItem or onSaveItem for compatibility
+  const handleItemLike = onLike || onLikeItem || onSaveItem || (() => {});
 
   useEffect(() => {
     if (initialItems) {
