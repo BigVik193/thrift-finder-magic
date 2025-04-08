@@ -29,16 +29,15 @@ serve(async (req) => {
         }
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
         const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
-        const HUGGINGFACE_API_KEY = Deno.env.get('HUGGINGFACE_API_KEY');
+        const FLASK_SERVER_URL =
+            Deno.env.get('FLASK_SERVER_URL') ?? 'http://localhost:5000';
 
         if (!OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
-        if (!HUGGINGFACE_API_KEY)
-            throw new Error('Missing HUGGINGFACE_API_KEY');
 
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         // 1. Get or create wardrobe
         const { data: wardrobe, error: wardrobeError } = await supabase
@@ -88,39 +87,39 @@ serve(async (req) => {
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Prepare prompt with inline base64 image for IDEFICS
-        // const promptWithImage = `User: Describe the clothing item in the image and respond with format: '<Type>: <Description>'. Type must be one of: Tops, Bottoms, Outerwear, Footwear, or Other. Description should describe the clothing item in detail. ![](data:image/jpeg;base64,${base64Str})<end_of_utterance>\nAssistant:`;
-        const promptWithImage = `User: Describe the clothing item in the image and respond with format: '<Type>: <Description>'. Type must be one of: Tops, Bottoms, Outerwear, Footwear, or Other. Description should describe the clothing item in detail. ![](data:image/jpeg;base64,${imageUrl})<end_of_utterance>\nAssistant:`;
+        // 4. Call Flask server for IDEFICS inference
+        // Option 1: Send the image URL to the Flask server
+        const ideficsResponse = await fetch(`${FLASK_SERVER_URL}/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image_url: imageUrl,
+            }),
+        });
 
-        // Send request to IDEFICS 9B model (Instruct version recommended)
-        const ideficsResponse = await fetch(
-            'https://api-inference.huggingface.co/models/HuggingFaceM4/idefics-9b-instruct',
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    inputs: promptWithImage,
-                    parameters: {
-                        max_new_tokens: 300,
-                        temperature: 0.2,
-                        top_p: 0.9,
-                        stop: ['<end_of_utterance>', '\nUser:'],
-                    },
-                }),
-            }
-        );
+        // Option 2: If needed, you can use base64 directly
+        // const ideficsResponse = await fetch(`${FLASK_SERVER_URL}/generate_from_base64`, {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({
+        //         image_base64: imageBase64,
+        //     }),
+        // });
 
         const ideficsData = await ideficsResponse.json();
 
-        if (!ideficsResponse.ok || !ideficsData.generated_text) {
+        if (!ideficsResponse.ok || !ideficsData.success) {
             console.error('IDEFICS API error:', ideficsData);
             throw new Error('Failed to get clothing description from IDEFICS');
         }
 
-        // Parse the response with simple string parsing
+        const generatedText = ideficsData.generated_text.trim();
+
+        // Parse the response to extract type and description
         let description: string;
         let clothingType:
             | 'Tops'
@@ -130,8 +129,6 @@ serve(async (req) => {
             | 'Other';
 
         try {
-            const generatedText = ideficsData.generated_text.trim();
-
             // Look for the format "<Type>: <Description>"
             const formatMatch = generatedText.match(
                 /^(Tops|Bottoms|Outerwear|Footwear|Other):\s*(.+)$/is
@@ -212,7 +209,7 @@ serve(async (req) => {
             console.error(
                 'Failed to parse IDEFICS response:',
                 err,
-                ideficsData
+                generatedText
             );
             // Fallback values
             description = 'Clothing item';
