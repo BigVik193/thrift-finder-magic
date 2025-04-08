@@ -29,7 +29,8 @@ serve(async (req) => {
         }
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        const supabaseServiceRoleKey =
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
         const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
         const FLASK_SERVER_URL =
@@ -80,35 +81,24 @@ serve(async (req) => {
         if (uploadError)
             throw new Error(`Image upload failed: ${uploadError.message}`);
 
-        // 3. Generate signed URL
+        // 3. Generate signed URL (still needed for database storage)
         const { data: urlData } = await supabase.storage
             .from('wardrobe-uploads')
             .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Call Flask server for IDEFICS inference
-        // Option 1: Send the image URL to the Flask server
+        // 4. Call Flask server with base64 image directly
         const ideficsResponse = await fetch(`${FLASK_SERVER_URL}/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true',
             },
             body: JSON.stringify({
-                image_url: imageUrl,
+                image_base64: imageBase64,
             }),
         });
-
-        // Option 2: If needed, you can use base64 directly
-        // const ideficsResponse = await fetch(`${FLASK_SERVER_URL}/generate_from_base64`, {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //     },
-        //     body: JSON.stringify({
-        //         image_base64: imageBase64,
-        //     }),
-        // });
 
         const ideficsData = await ideficsResponse.json();
 

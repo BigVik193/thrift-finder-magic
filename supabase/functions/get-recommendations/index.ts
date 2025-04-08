@@ -51,15 +51,12 @@ serve(async (req) => {
             .from('user_style_preferences')
             .select('style_vector')
             .eq('user_id', user_id)
-            .single();
+            .maybeSingle();
 
-        if (userError || !userPref?.style_vector) {
-            throw new Error('User style vector not found');
-        }
-
-        let userVector: number[] = userPref?.style_vector;
+        let userVector: number[] | null = userPref?.style_vector || null;
 
         if (!userVector) {
+            // Insert a zero vector if none exists
             userVector = Array(1536).fill(0);
 
             const { error: insertError } = await supabase
@@ -73,11 +70,16 @@ serve(async (req) => {
             if (insertError) {
                 throw new Error('Failed to create zero vector');
             }
+
+            // Return empty results since it's a zero vector
+            return new Response(JSON.stringify({ results: [] }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
         }
 
         // Check if userVector is all zeros
         const isZeroVector = userVector.every((val) => val === 0);
-
         if (isZeroVector) {
             return new Response(JSON.stringify({ results: [] }), {
                 status: 200,
@@ -95,7 +97,7 @@ serve(async (req) => {
 
         // 3. Run similarity query via RPC (server-side SQL)
         const { data: recommendations, error: simError } = await supabase.rpc(
-            'get_similar_listings', // we'll define this function next
+            'get_similar_listings',
             {
                 user_vector: userVector,
                 exclude_ids: savedIds,
