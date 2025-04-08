@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '@/components/layout/Navbar';
 import { WardrobeGrid } from '@/components/ui/WardrobeGrid';
 import { Button } from '@/components/ui/button';
-import { AddItemModal } from '@/components/wardrobe/AddItemModal';
 import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
 import { useAuth } from '@/hooks/useAuth';
 import { 
@@ -22,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getWardrobeItems, deleteWardrobeItem } from '@/services/wardrobeUploadService';
 import { getRecommendedItems } from '@/services/listingService';
+import { useNavigate } from 'react-router-dom';
 
 interface CategoryTabProps {
   icon: React.ElementType;
@@ -63,16 +62,15 @@ const CategoryTab: React.FC<CategoryTabProps> = ({
 const Wardrobe = () => {
   const { user, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState('All');
-  const [isAddingItem, setIsAddingItem] = useState(false);
   const [fadeIn, setFadeIn] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
   const { data: wardrobeItems = [], isLoading, error } = useQuery({
     queryKey: ['wardrobeItems'],
-    queryFn: getWardrobeItems,
+    queryFn: getWardrobeItems
   });
   
-  // Show error toast if the query fails
   useEffect(() => {
     if (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to fetch wardrobe items');
@@ -94,6 +92,10 @@ const Wardrobe = () => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       deleteMutation.mutate(id);
     }
+  };
+  
+  const handleAddItem = () => {
+    navigate('/upload');
   };
   
   useEffect(() => {
@@ -145,10 +147,6 @@ const Wardrobe = () => {
     return counts;
   }, [wardrobeItems]);
   
-  const handleAddItem = () => {
-    setIsAddingItem(true);
-  };
-
   const categories = [
     { icon: ShirtIcon, label: 'All', count: countByCategory.All },
     { icon: Shirt, label: 'Tops', count: countByCategory.Tops },
@@ -303,14 +301,6 @@ const Wardrobe = () => {
           )}
         </div>
       </main>
-      
-      {isAddingItem && (
-        <AddItemModal 
-          isOpen={isAddingItem} 
-          onClose={() => setIsAddingItem(false)} 
-          wardrobeId="" 
-        />
-      )}
     </div>
   );
 };
