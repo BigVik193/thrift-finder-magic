@@ -58,7 +58,7 @@ serve(async (req) => {
 **"${userQuery}"**
 - Include key details (category, style, color, condition).
 - If vague, infer intent and create effective searches. Be creative.
-- Return **one to three** concise, diverse queries.
+- Return **one or two** concise, diverse queries.
 - If unrelated to fashion, return an error.
 - User gender is ${userGender || 'unspecified'}
 - Output as JSON:

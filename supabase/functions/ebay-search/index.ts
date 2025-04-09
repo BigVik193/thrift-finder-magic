@@ -87,7 +87,7 @@ serve(async (req) => {
       console.log(`Processing search term: ${term}`);
       
       try {
-        const response = await fetch(`${EBAY_SEARCH_URL}?q=${encodeURIComponent(term)}&limit=10`, {
+        const response = await fetch(`${EBAY_SEARCH_URL}?q=${encodeURIComponent(term)}&limit=20`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${EBAY_AUTH}`,
