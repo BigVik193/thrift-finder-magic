@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -34,6 +33,12 @@ export interface RecentActivity {
   time: string;
 }
 
+export interface UserSearch {
+  id: string;
+  query: string;
+  created_at: string;
+}
+
 export const getUserProfile = async (): Promise<UserProfile | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -48,7 +53,6 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     
     if (error) throw error;
     
-    // Transform the database gender enum to match our interface
     const transformedData: UserProfile = {
       id: data.id,
       name: data.name,
@@ -78,13 +82,11 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
     
     if (error) throw error;
     
-    // Parse the sizes JSON object safely with more explicit type handling
     let sizesData: Record<string, string | null> = {};
     if (data.sizes && typeof data.sizes === 'object' && !Array.isArray(data.sizes)) {
       sizesData = data.sizes as Record<string, string | null>;
     }
     
-    // Parse the price_range JSON object safely with more explicit type handling
     let priceRangeData: Record<string, number> = { min: 0, max: 100 };
     if (data.price_range && typeof data.price_range === 'object' && !Array.isArray(data.price_range)) {
       const priceRange = data.price_range as Record<string, unknown>;
@@ -92,7 +94,6 @@ export const getUserStylePreferences = async (): Promise<StylePreference | null>
       if (typeof priceRange.max === 'number') priceRangeData.max = priceRange.max;
     }
     
-    // Transform the database JSON to match our interface
     const transformedData: StylePreference = {
       user_id: data.user_id,
       sizes: {
@@ -145,7 +146,6 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (!user) return [];
     
-    // Get liked items activity - fixed query to properly fetch listing titles
     const { data: likedData, error: likedError } = await supabase
       .from('liked_items')
       .select('listing_id, saved_at')
@@ -155,15 +155,11 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (likedError) throw likedError;
     
-    // Create an array to store activity with listing titles
     const likedActivity: RecentActivity[] = [];
     
-    // If we have liked items, fetch their titles from the listings table separately
     if (likedData && likedData.length > 0) {
-      // Get the listing IDs from liked items
       const listingIds = likedData.map(item => item.listing_id);
       
-      // Fetch the corresponding listings
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
         .select('id, title')
@@ -171,7 +167,6 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
       
       if (listingsError) throw listingsError;
       
-      // Create activity entries with titles from listings
       for (const likedItem of likedData) {
         const listing = listingsData?.find(l => l.id === likedItem.listing_id);
         if (listing) {
@@ -185,7 +180,6 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
       }
     }
     
-    // Get search activity
     const { data: searches, error: searchError } = await supabase
       .from('user_searches')
       .select('id, query, created_at')
@@ -195,7 +189,6 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
     
     if (searchError) throw searchError;
     
-    // Format search activities
     const searchActivity = (searches || []).map(search => ({
       id: search.id,
       type: 'search' as const,
@@ -203,7 +196,6 @@ export const getRecentActivity = async (limit = 5): Promise<RecentActivity[]> =>
       time: format(new Date(search.created_at), 'MMM d, h:mm a')
     }));
     
-    // Combine and sort by time (newest first)
     const allActivity = [...likedActivity, ...searchActivity]
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, limit);
@@ -222,5 +214,30 @@ export const signOutUser = async (): Promise<void> => {
   } catch (error) {
     console.error('Error signing out:', error);
     toast.error('Failed to sign out');
+  }
+};
+
+export const getUserRecentSearches = async (limit = 5): Promise<UserSearch[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return [];
+    
+    const { data, error } = await supabase
+      .from('user_searches')
+      .select('id, query, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('Error fetching user searches:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in getUserRecentSearches:', error);
+    return [];
   }
 };

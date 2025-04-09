@@ -7,10 +7,8 @@ import {
   Grid3x3, 
   Heart, 
   ArrowUpRight, 
-  TrendingUp,
-  Sparkles,
-  ChevronRight,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -20,15 +18,14 @@ import { RecommendationCarousel } from '@/components/ui/RecommendationCarousel';
 import { cn } from '@/lib/utils';
 import { getUserLikedItems, getRecommendedItems, likeItemForUser } from '@/services/listingService';
 import { useAuth } from '@/hooks/useAuth';
-
-// Sample data for trending searches 
-const trendingSearches = ["baggy cargo pants", "chunky loafers", "oversized cardigan", "90s sunglasses"];
+import { getUserRecentSearches } from '@/services/profileService';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [greeting, setGreeting] = useState('Good day');
   const [animateCards, setAnimateCards] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isLoadingSearches, setIsLoadingSearches] = useState(false);
   const [isLoadingLiked, setIsLoadingLiked] = useState(false);
   const [likedItems, setLikedItems] = useState<any[]>([]);
 
@@ -44,16 +41,26 @@ const Dashboard = () => {
       setAnimateCards(true);
     }, 300);
 
-    // Load the user's recent searches (placeholder for now)
-    setRecentSearches(["vintage denim jacket", "y2k tops", "leather boots size 9"]);
-
-    // Load the user's liked items
+    // Load the user's recent searches
     if (user) {
+      loadRecentSearches();
       loadLikedItems();
     }
 
     return () => clearTimeout(timer);
   }, [user]);
+
+  const loadRecentSearches = async () => {
+    setIsLoadingSearches(true);
+    try {
+      const searches = await getUserRecentSearches(5); // Get most recent 5 searches
+      setRecentSearches(searches.map(search => search.query));
+    } catch (error) {
+      console.error('Error loading recent searches:', error);
+    } finally {
+      setIsLoadingSearches(false);
+    }
+  };
 
   const loadLikedItems = async () => {
     setIsLoadingLiked(true);
@@ -118,7 +125,11 @@ const Dashboard = () => {
               className="max-w-3xl mx-auto"
             />
             
-            {recentSearches.length > 0 && (
+            {isLoadingSearches ? (
+              <div className="mt-3 flex justify-center">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : recentSearches.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2 justify-center">
                 <span className="text-sm text-muted-foreground">Recent:</span>
                 {recentSearches.map((search, index) => (
@@ -130,6 +141,10 @@ const Dashboard = () => {
                     {search}
                   </button>
                 ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-center text-sm text-muted-foreground">
+                No recent searches. Start exploring!
               </div>
             )}
           </div>
@@ -247,31 +262,6 @@ const Dashboard = () => {
               onLikeItem={handleLikeItem}
               emptyMessage="We're still learning your style preferences. Like a few items to get personalized recommendations!"
             />
-          </section>
-          
-          {/* Trending Searches */}
-          <section className={cn(
-            "glass-card p-6",
-            animateCards ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
-            "transition-all duration-500"
-          )} style={{ transitionDelay: '450ms' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Trending Searches</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-              {trendingSearches.map((search, index) => (
-                <button 
-                  key={index}
-                  onClick={() => handleSearch(search)}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <span>{search}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
           </section>
           
           {/* Upgrade Banner */}

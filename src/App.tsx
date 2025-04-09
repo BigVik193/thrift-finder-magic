@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Navbar } from "@/components/layout/Navbar";
@@ -22,6 +21,22 @@ import Auth from "./pages/Auth";
 
 const queryClient = new QueryClient();
 
+// Home route component to handle authentication redirection
+const HomeRoute = () => {
+  const { user, loading } = useAuth();
+  
+  // While checking auth state, show nothing
+  if (loading) return null;
+  
+  // If user is logged in, redirect to dashboard
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // Otherwise show the landing page
+  return <Index />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -30,8 +45,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Special route for homepage because it may have custom navbar styling */}
-            <Route path="/" element={<Index />} />
+            {/* Home route with conditional redirection */}
+            <Route path="/" element={<HomeRoute />} />
             
             {/* Auth page has its own navbar for better UX */}
             <Route path="/auth" element={<Auth />} />
