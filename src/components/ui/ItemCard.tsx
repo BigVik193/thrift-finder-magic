@@ -13,6 +13,11 @@ interface ItemCardProps {
     platform: string;
     size?: string;
     condition?: string;
+    url?: string;
+    currency?: string;
+    seller_username?: string;
+    seller_feedback_percentage?: string;
+    seller_feedback_score?: number;
   };
   className?: string;
   onLike?: (id: string, isLiked: boolean) => void;
@@ -43,7 +48,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    const newLikedStatus = await likeItemForUser(item.id);
+    // Prepare full item data for liking
+    const fullItemData = {
+      id: item.id,
+      title: item.title,
+      image: item.image,
+      price: parseFloat(item.price.replace(/[^0-9.]/g, '')),
+      platform: item.platform as any,
+      condition: item.condition || 'Not specified',
+      url: item.url || `https://example.com/item/${item.id}`,
+      currency: item.currency || 'USD',
+      seller_username: item.seller_username || 'Unknown Seller',
+      seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+      seller_feedback_score: item.seller_feedback_score || 0,
+    };
+    
+    const newLikedStatus = await likeItemForUser(item.id, fullItemData);
     setIsLiked(newLikedStatus);
     
     if (onLike) onLike(item.id, newLikedStatus);

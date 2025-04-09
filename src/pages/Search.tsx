@@ -29,10 +29,13 @@ const formatListingForDisplay = (listing: any) => ({
   price: `$${listing.price}`,
   image: listing.image,
   platform: listing.platform,
-  condition: listing.condition,
-  seller_username: listing.seller_username,
+  condition: listing.condition || 'Not specified',
+  seller_username: listing.seller_username || 'Unknown Seller',
+  seller_feedback_percentage: listing.seller_feedback_percentage || 'N/A',
+  seller_feedback_score: listing.seller_feedback_score || 0,
   size: '',
-  url: listing.url
+  url: listing.url || '',
+  currency: listing.currency || 'USD'
 });
 
 const Search = () => {
@@ -150,14 +153,14 @@ const Search = () => {
             id: item.id,
             title: item.title,
             price: item.price,
-            currency: item.currency,
+            currency: item.currency || 'USD',
             image: item.image,
-            platform: item.platform,
+            platform: item.platform || 'eBay',
             seller_username: item.seller_username || 'Unknown Seller',
             seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
             seller_feedback_score: item.seller_feedback_score || 0,
             condition: item.condition || 'Not specified',
-            url: item.url || ''
+            url: item.url || `https://example.com/item/${item.id}`
           });
         });
         
@@ -194,7 +197,17 @@ const Search = () => {
   
   const handleLikeItem = async (id: string, isLiked: boolean) => {
     console.log(`Item ${id} is now ${isLiked ? 'liked' : 'unliked'}`);
-    await likeItemForUser(id);
+    
+    const item = results.find(item => item.id === id);
+    if (item) {
+      const numericPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
+      await likeItemForUser(id, {
+        ...item,
+        price: numericPrice
+      });
+    } else {
+      await likeItemForUser(id);
+    }
   };
 
   const loadMoreResults = () => {

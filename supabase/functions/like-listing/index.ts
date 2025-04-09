@@ -60,6 +60,26 @@ serve(async (req) => {
             );
         }
 
+        // Validate required fields for new listings
+        const requiredFields = ['title', 'price', 'currency', 'image', 'platform', 'url'];
+        const missingFields = requiredFields.filter(field => !item[field]);
+        
+        if (missingFields.length > 0) {
+            return new Response(
+                JSON.stringify({ 
+                    error: `Missing required fields: ${missingFields.join(', ')}`,
+                    provided: item
+                }),
+                {
+                    status: 400,
+                    headers: {
+                        ...corsHeaders,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+        }
+
         // Check if the user already liked this item
         const { data: existingLike } = await supabase
             .from('liked_items')
@@ -103,10 +123,10 @@ serve(async (req) => {
                         currency: item.currency,
                         image: item.image,
                         platform: item.platform,
-                        seller_username: item.seller_username,
-                        seller_feedback_percentage: item.seller_feedback_percentage,
-                        seller_feedback_score: item.seller_feedback_score,
-                        condition: item.condition,
+                        seller_username: item.seller_username || 'Unknown',
+                        seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+                        seller_feedback_score: item.seller_feedback_score || 0,
+                        condition: item.condition || 'Unknown',
                         url: item.url,
                     });
 

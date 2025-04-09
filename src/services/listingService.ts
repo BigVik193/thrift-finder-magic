@@ -17,7 +17,7 @@ export interface Listing {
 }
 
 // Like an item for a user
-export const likeItemForUser = async (listingId: string): Promise<boolean> => {
+export const likeItemForUser = async (listingId: string, fullListingData?: Partial<Listing>): Promise<boolean> => {
     try {
         const {
             data: { user },
@@ -42,15 +42,28 @@ export const likeItemForUser = async (listingId: string): Promise<boolean> => {
             .eq('id', listingId)
             .maybeSingle();
 
+        // If the listing doesn't exist in our database yet, use the provided data or create minimal required data
+        const itemData = listing || fullListingData || { id: listingId };
+        
+        // Ensure all required fields are present
+        if (!listing && !fullListingData?.platform) {
+            console.error('Missing required listing data for id:', listingId, 'Data:', fullListingData);
+            toast.error('Unable to like item: Missing required data');
+            return false;
+        }
+
         // Use the like-listing edge function
         const { data, error } = await supabase.functions.invoke('like-listing', {
             body: { 
-                item: listing || { id: listingId },
+                item: itemData,
                 userId: user.id
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error from like-listing function:', error);
+            throw error;
+        }
 
         // The edge function returns whether the item is now liked
         const isLiked = data.success;
