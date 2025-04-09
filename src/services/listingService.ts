@@ -16,7 +16,7 @@ export interface Listing {
     url: string;
 }
 
-// Like an item for a user
+// Like or unlike an item for a user
 export const likeItemForUser = async (listingId: string, fullListingData?: Partial<Listing>): Promise<boolean> => {
     try {
         const {
@@ -35,22 +35,25 @@ export const likeItemForUser = async (listingId: string, fullListingData?: Parti
             return false;
         }
 
-        // Get full item details if we have them
-        const { data: listing } = await supabase
+        // Get full item details if we have them or if it exists in our database
+        const { data: existingListing } = await supabase
             .from('listings')
             .select('*')
             .eq('id', listingId)
             .maybeSingle();
 
         // If the listing doesn't exist in our database yet, use the provided data or create minimal required data
-        const itemData = listing || fullListingData || { id: listingId };
+        const itemData = existingListing || fullListingData || { id: listingId };
         
-        // Ensure all required fields are present
-        if (!listing && !fullListingData?.platform) {
+        // Check if we have all the required data
+        if (!existingListing && (!fullListingData?.platform || !fullListingData?.title || !fullListingData?.price)) {
             console.error('Missing required listing data for id:', listingId, 'Data:', fullListingData);
             toast.error('Unable to like item: Missing required data');
             return false;
         }
+
+        // First check the current like status
+        const isCurrentlyLiked = await isItemLiked(listingId);
 
         // Use the like-listing edge function
         const { data, error } = await supabase.functions.invoke('like-listing', {
@@ -68,16 +71,17 @@ export const likeItemForUser = async (listingId: string, fullListingData?: Parti
         // The edge function returns whether the item is now liked
         const isLiked = data.success;
         
-        if (data.message.includes("liked")) {
-            toast.success('Item liked successfully');
-        } else {
+        // Show appropriate toast message
+        if (isCurrentlyLiked) {
             toast.success('Item unliked successfully');
+        } else {
+            toast.success('Item liked successfully');
         }
 
         return isLiked;
     } catch (error) {
         console.error('Error liking item for user:', error);
-        toast.error('Failed to like item');
+        toast.error('Failed to update like status');
         return false;
     }
 };

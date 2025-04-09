@@ -60,33 +60,18 @@ serve(async (req) => {
             );
         }
 
-        // Validate required fields for new listings
-        const requiredFields = ['title', 'price', 'currency', 'image', 'platform', 'url'];
-        const missingFields = requiredFields.filter(field => !item[field]);
-        
-        if (missingFields.length > 0) {
-            return new Response(
-                JSON.stringify({ 
-                    error: `Missing required fields: ${missingFields.join(', ')}`,
-                    provided: item
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        ...corsHeaders,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-        }
-
         // Check if the user already liked this item
-        const { data: existingLike } = await supabase
+        const { data: existingLike, error: checkError } = await supabase
             .from('liked_items')
             .select('user_id, listing_id')
             .eq('user_id', userId)
             .eq('listing_id', item.id)
             .maybeSingle();
+
+        if (checkError) {
+            console.error('Error checking for existing like:', checkError);
+            throw new Error(`Error checking like status: ${checkError.message}`);
+        }
 
         let success = false;
         let message = '';
@@ -106,14 +91,39 @@ serve(async (req) => {
             success = false;
             message = 'Item unliked successfully';
         } else {
-            // If not already in the database, save the listing
-            const { data: existingListing } = await supabase
+            // If not already in the database, check if the listing exists
+            const { data: existingListing, error: listingError } = await supabase
                 .from('listings')
                 .select('id')
                 .eq('id', item.id)
                 .maybeSingle();
 
+            if (listingError) {
+                console.error('Error checking for existing listing:', listingError);
+            }
+
+            // Validate required fields for new listings
             if (!existingListing) {
+                const requiredFields = ['title', 'price', 'currency', 'image', 'platform', 'url'];
+                const missingFields = requiredFields.filter(field => !item[field]);
+                
+                if (missingFields.length > 0) {
+                    return new Response(
+                        JSON.stringify({ 
+                            error: `Missing required fields: ${missingFields.join(', ')}`,
+                            provided: item
+                        }),
+                        {
+                            status: 400,
+                            headers: {
+                                ...corsHeaders,
+                                'Content-Type': 'application/json',
+                            },
+                        }
+                    );
+                }
+
+                // Insert the new listing
                 const { error: insertError } = await supabase
                     .from('listings')
                     .insert({
@@ -131,56 +141,65 @@ serve(async (req) => {
                     });
 
                 if (insertError) {
-                    throw new Error(
-                        `Error inserting listing: ${insertError.message}`
-                    );
+                    console.error('Error inserting listing:', insertError);
+                    throw new Error(`Error inserting listing: ${insertError.message}`);
                 }
 
-                const { error: embeddingError } = await supabase.functions.invoke(
-                    'generate-listing-embedding',
-                    {
-                        body: { listing_id: item.id },
-                    }
-                );
-
-                if (embeddingError) {
-                    console.error(
-                        'Error invoking generate-listing-embedding:',
-                        embeddingError
+                // Generate embedding for the new listing
+                try {
+                    const { error: embeddingError } = await supabase.functions.invoke(
+                        'generate-listing-embedding',
+                        {
+                            body: { listing_id: item.id },
+                        }
                     );
+
+                    if (embeddingError) {
+                        console.error('Error invoking generate-listing-embedding:', embeddingError);
+                        // Continue despite embedding error - we'll handle this later
+                    }
+                } catch (embeddingErr) {
+                    console.error('Failed to generate embedding:', embeddingErr);
+                    // Continue despite embedding error
                 }
             }
 
             // Now like the item (add record to liked_items)
-            const { error: likeError } = await supabase
-                .from('liked_items')
-                .insert({
-                    user_id: userId,
-                    listing_id: item.id,
-                });
+            try {
+                const { error: likeError } = await supabase
+                    .from('liked_items')
+                    .insert({
+                        user_id: userId,
+                        listing_id: item.id,
+                    });
 
-            if (likeError) {
-                throw new Error(
-                    `Error liking item for user: ${likeError.message}`
-                );
+                if (likeError) {
+                    throw new Error(`Error liking item for user: ${likeError.message}`);
+                }
+            } catch (likeErr) {
+                console.error('Error inserting like:', likeErr);
+                throw likeErr;
             }
 
             // Update user style vector using EMA with the new embedding
-            const { error: vectorUpdateError } = await supabase.functions.invoke(
-                'update-user-style-vector',
-                {
-                    body: {
-                        user_id: userId,
-                        new_listing_id: item.id,
-                    },
-                }
-            );
-
-            if (vectorUpdateError) {
-                console.error(
-                    'Error updating user style vector:',
-                    vectorUpdateError
+            try {
+                const { error: vectorUpdateError } = await supabase.functions.invoke(
+                    'update-user-style-vector',
+                    {
+                        body: {
+                            user_id: userId,
+                            new_listing_id: item.id,
+                        },
+                    }
                 );
+
+                if (vectorUpdateError) {
+                    console.error('Error updating user style vector:', vectorUpdateError);
+                    // Continue despite vector update error
+                }
+            } catch (vectorErr) {
+                console.error('Failed to update style vector:', vectorErr);
+                // Continue despite vector update error
             }
             
             success = true;
@@ -201,6 +220,7 @@ serve(async (req) => {
         return new Response(
             JSON.stringify({
                 error: error.message || 'An unknown error occurred',
+                success: false,
             }),
             {
                 status: 500,

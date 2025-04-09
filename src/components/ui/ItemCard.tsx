@@ -33,6 +33,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isLiked, setIsLiked] = useState(initialLiked);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isLikeInProgress, setIsLikeInProgress] = useState(false);
   
   // Check if the item is liked when component mounts
   useEffect(() => {
@@ -44,29 +45,46 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     checkLikedStatus();
   }, [item.id]);
   
+  // Also update state when initialLiked prop changes
+  useEffect(() => {
+    setIsLiked(initialLiked);
+  }, [initialLiked]);
+  
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Prepare full item data for liking
-    const fullItemData = {
-      id: item.id,
-      title: item.title,
-      image: item.image,
-      price: parseFloat(item.price.replace(/[^0-9.]/g, '')),
-      platform: item.platform as any,
-      condition: item.condition || 'Not specified',
-      url: item.url || `https://example.com/item/${item.id}`,
-      currency: item.currency || 'USD',
-      seller_username: item.seller_username || 'Unknown Seller',
-      seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
-      seller_feedback_score: item.seller_feedback_score || 0,
-    };
+    // Prevent multiple rapid clicks
+    if (isLikeInProgress) return;
     
-    const newLikedStatus = await likeItemForUser(item.id, fullItemData);
-    setIsLiked(newLikedStatus);
-    
-    if (onLike) onLike(item.id, newLikedStatus);
+    try {
+      setIsLikeInProgress(true);
+      
+      // Prepare full item data for liking
+      const fullItemData = {
+        id: item.id,
+        title: item.title,
+        image: item.image,
+        price: parseFloat(item.price.replace(/[^0-9.]/g, '')),
+        platform: item.platform as any,
+        condition: item.condition || 'Not specified',
+        url: item.url || `https://example.com/item/${item.id}`,
+        currency: item.currency || 'USD',
+        seller_username: item.seller_username || 'Unknown Seller',
+        seller_feedback_percentage: item.seller_feedback_percentage || 'N/A',
+        seller_feedback_score: item.seller_feedback_score || 0,
+      };
+      
+      // Toggle like status - this will handle both liking and unliking
+      const newLikedStatus = await likeItemForUser(item.id, fullItemData);
+      setIsLiked(newLikedStatus);
+      
+      if (onLike) onLike(item.id, newLikedStatus);
+    } catch (error) {
+      console.error('Error toggling like status:', error);
+    } finally {
+      setIsLikeInProgress(false);
+    }
   };
 
   return (
@@ -99,9 +117,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         
         <button
           onClick={handleLike}
+          disabled={isLikeInProgress}
           className={cn(
             "absolute top-3 right-3 p-2 rounded-full z-10 transition-all duration-200",
             "bg-background/80 backdrop-blur-sm hover:bg-background shadow-sm",
+            isLikeInProgress ? "opacity-70" : "opacity-100",
             isLiked ? "text-accent" : "text-muted-foreground"
           )}
           title={isLiked ? "Unlike" : "Like"}
