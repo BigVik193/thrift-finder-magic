@@ -35,117 +35,27 @@ export const likeItemForUser = async (listingId: string): Promise<boolean> => {
             return false;
         }
 
-        // For debugging
-        console.log(`Attempting to like item ${listingId} for user ${user.id}`);
-
         // Get full item details if we have them
         const { data: listing } = await supabase
             .from('listings')
             .select('*')
             .eq('id', listingId)
             .maybeSingle();
+
+        // Use the like-listing edge function
+        const { data, error } = await supabase.functions.invoke('like-listing', {
+            body: { 
+                item: listing || { id: listingId },
+                userId: user.id
+            },
+        });
+
+        if (error) throw error;
+
+        // The edge function returns whether the item is now liked
+        const isLiked = data.success;
         
-        if (listing) {
-            console.log('Found listing details:', listing.id, listing.title);
-        } else {
-            console.log('No listing details found in database, using minimal data');
-        }
-
-        // Check the current like status to toggle correctly
-        const { data: existingLike } = await supabase
-            .from('liked_items')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('listing_id', listingId)
-            .maybeSingle();
-
-        let isLiked = false;
-        let message = '';
-
-        // Directly modify the database instead of using the edge function
-        // which seems to be failing or not being called
-        if (existingLike) {
-            // If already liked, unlike it
-            const { error: unlikeError } = await supabase
-                .from('liked_items')
-                .delete()
-                .eq('user_id', user.id)
-                .eq('listing_id', listingId);
-
-            if (unlikeError) {
-                console.error('Error unliking item:', unlikeError);
-                throw unlikeError;
-            }
-            
-            isLiked = false;
-            message = 'Item unliked successfully';
-            console.log('Item unliked successfully');
-        } else {
-            // If not liked, like it
-            // First, ensure the listing exists in the database if we have full details
-            if (listing) {
-                // No need to insert, it already exists
-                console.log('Listing already exists in database');
-            } else if (listing === null) {
-                // This means the item doesn't exist and we only have the ID
-                // We'll create a minimal listing entry
-                console.log('Creating minimal listing entry');
-                const minimalListing = {
-                    id: listingId,
-                    title: 'Unknown Item',
-                    price: 0,
-                    currency: 'USD',
-                    image: '',
-                    platform: 'eBay' as const,
-                    seller_username: 'Unknown',
-                    seller_feedback_percentage: '0',
-                    condition: 'Unknown',
-                    url: ''
-                };
-                
-                const { error: insertError } = await supabase
-                    .from('listings')
-                    .insert(minimalListing);
-                
-                if (insertError) {
-                    console.error('Error inserting minimal listing:', insertError);
-                    // Continue anyway - we'll just reference the ID
-                }
-            }
-
-            // Now add the like entry
-            const { error: likeError } = await supabase
-                .from('liked_items')
-                .insert({
-                    user_id: user.id,
-                    listing_id: listingId,
-                });
-
-            if (likeError) {
-                console.error('Error liking item:', likeError);
-                throw likeError;
-            }
-            
-            isLiked = true;
-            message = 'Item liked successfully';
-            console.log('Item liked successfully');
-            
-            // Separately trigger the style vector update
-            try {
-                console.log('Triggering style vector update');
-                await supabase.functions.invoke('update-user-style-vector', {
-                    body: {
-                        user_id: user.id,
-                        new_listing_id: listingId,
-                    },
-                });
-            } catch (vectorError) {
-                // Don't fail the like operation if this fails
-                console.error('Error updating style vector, but like was saved:', vectorError);
-            }
-        }
-        
-        if (message.includes("liked")) {
+        if (data.message.includes("liked")) {
             toast.success('Item liked successfully');
         } else {
             toast.success('Item unliked successfully');
