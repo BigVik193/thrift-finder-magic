@@ -11,7 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getUserLikedItems, likeItemForUser } from '@/services/listingService';
+import { getUserLikedItems, toggleItemLike } from '@/services/listingService';
 import { useAuth } from '@/hooks/useAuth';
 
 const LikedItems = () => {
@@ -80,7 +80,7 @@ const LikedItems = () => {
   const handleDelete = async () => {
     // Unlike all selected items
     for (const id of selectedItems) {
-      await toggleItemLike(id); // This toggles the liked status
+      await toggleItemLike(id); // Now using the imported toggleItemLike function
     }
     
     // Update the UI
