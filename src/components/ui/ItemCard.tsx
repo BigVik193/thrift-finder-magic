@@ -58,6 +58,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     if (isLikeInProgress) return;
     
     try {
+      // Optimistic UI update - toggle immediately for better UX
+      const newLikedStatus = !isLiked;
+      setIsLiked(newLikedStatus);
       setIsLikeInProgress(true);
       
       // Prepare full item data for liking
@@ -75,15 +78,24 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         seller_feedback_score: item.seller_feedback_score || 0,
       };
       
-      // Toggle like status - this will handle both liking and unliking
-      const newLikedStatus = await likeItemForUser(item.id, fullItemData);
-      setIsLiked(newLikedStatus);
+      // Call the like service
+      const serverLikedStatus = await likeItemForUser(item.id, fullItemData);
       
-      if (onLike) onLike(item.id, newLikedStatus);
+      // If server response differs from our optimistic update, revert
+      if (serverLikedStatus !== newLikedStatus) {
+        setIsLiked(serverLikedStatus);
+      }
+      
+      if (onLike) onLike(item.id, serverLikedStatus);
     } catch (error) {
       console.error('Error toggling like status:', error);
+      // Revert to previous state on error
+      setIsLiked(!isLiked);
     } finally {
-      setIsLikeInProgress(false);
+      // Add a small delay before allowing more likes to prevent rapid clicking
+      setTimeout(() => {
+        setIsLikeInProgress(false);
+      }, 300);
     }
   };
 

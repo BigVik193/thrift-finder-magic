@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -97,7 +98,7 @@ export const uploadWardrobeImage = async (
         onStatusChange({
             status: 'processing',
             progress: 50,
-            message: 'Processing image...',
+            message: 'Uploading image...',
         });
 
         // Call the Supabase Edge Function
@@ -121,10 +122,15 @@ export const uploadWardrobeImage = async (
             throw error;
         }
 
+        // Response now comes back quickly before background processing completes
         onStatusChange({
             status: 'success',
             progress: 100,
-            message: 'Upload complete!',
+            message: data.message || 'Upload complete! Processing in background...',
+        });
+
+        toast.success('Image uploaded successfully', {
+            description: 'The image is being processed in the background and will appear in your wardrobe shortly.'
         });
 
         return data;

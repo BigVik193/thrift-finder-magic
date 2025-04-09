@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -40,7 +41,7 @@ serve(async (req) => {
 
         const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-        // 1. Get or create wardrobe
+        // 1. Get or create wardrobe - Core operation
         const { data: wardrobe, error: wardrobeError } = await supabase
             .from('wardrobes')
             .select('id')
@@ -63,7 +64,7 @@ serve(async (req) => {
             wardrobeId = wardrobe.id;
         }
 
-        // 2. Upload image
+        // 2. Upload image - Core operation
         const timestamp = Date.now();
         const fileName = `${user_id}/upload/${timestamp}.jpg`;
         const base64Str = imageBase64.split(',')[1] || imageBase64;
@@ -81,220 +82,246 @@ serve(async (req) => {
         if (uploadError)
             throw new Error(`Image upload failed: ${uploadError.message}`);
 
-        // 3. Generate signed URL (still needed for database storage)
+        // 3. Generate signed URL - Core operation
         const { data: urlData } = await supabase.storage
             .from('wardrobe-uploads')
             .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
 
         const imageUrl = urlData.signedUrl;
 
-        // 4. Call Flask server with base64 image directly - FIX: Use the correct endpoint path
-        const ideficsResponse = await fetch(
-            `${FLASK_SERVER_URL}/api/test/generate`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    image_base64: imageBase64,
-                }),
-            }
-        );
+        // Prepare early response with critical data
+        const earlyResponse = {
+            success: true,
+            wardrobeId,
+            imageUrl,
+            message: 'Image uploaded successfully. Processing in background...'
+        };
 
-        // Error handling for non-JSON responses
-        const contentType = ideficsResponse.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const responseText = await ideficsResponse.text();
-            console.error('Non-JSON response from Flask server:', responseText);
-            throw new Error(
-                `Flask server returned non-JSON response: ${ideficsResponse.status} ${ideficsResponse.statusText}`
-            );
-        }
-
-        const ideficsData = await ideficsResponse.json();
-
-        if (!ideficsResponse.ok || !ideficsData.success) {
-            console.error('IDEFICS API error:', ideficsData);
-            throw new Error('Failed to get clothing description from IDEFICS');
-        }
-
-        const generatedText = ideficsData.generated_text.trim();
-
-        // Parse the response to extract type and description
-        let description: string;
-        let clothingType:
-            | 'Tops'
-            | 'Bottoms'
-            | 'Outerwear'
-            | 'Footwear'
-            | 'Other';
-
-        try {
-            // Look for the format "<Type>: <Description>"
-            const formatMatch = generatedText.match(
-                /^(Tops|Bottoms|Outerwear|Footwear|Other):\s*(.+)$/is
-            );
-
-            if (formatMatch) {
-                // Extract type and description from the formatted response
-                const extractedType = formatMatch[1].trim();
-                description = formatMatch[2].trim();
-
-                // Normalize the type to ensure exact match with our categories
-                if (/^tops?$/i.test(extractedType)) clothingType = 'Tops';
-                else if (/^bottoms?$/i.test(extractedType))
-                    clothingType = 'Bottoms';
-                else if (/^outerwear$/i.test(extractedType))
-                    clothingType = 'Outerwear';
-                else if (/^footwear$/i.test(extractedType))
-                    clothingType = 'Footwear';
-                else clothingType = 'Other';
-            } else {
-                // If we can't find the expected format, try to infer type and use rest as description
-                const typeKeywords = {
-                    Tops: [
-                        'shirt',
-                        'blouse',
-                        't-shirt',
-                        'top',
-                        'sweater',
-                        'tee',
-                        'tank',
-                    ],
-                    Bottoms: [
-                        'pants',
-                        'jeans',
-                        'shorts',
-                        'skirt',
-                        'trousers',
-                        'leggings',
-                    ],
-                    Outerwear: [
-                        'jacket',
-                        'coat',
-                        'hoodie',
-                        'cardigan',
-                        'blazer',
-                        'vest',
-                        'parka',
-                    ],
-                    Footwear: [
-                        'shoes',
-                        'boots',
-                        'sneakers',
-                        'sandals',
-                        'heels',
-                        'loafers',
-                    ],
-                };
-
-                let foundType = 'Other';
-                const lowerText = generatedText.toLowerCase();
-
-                // Try to detect type based on keywords
-                for (const [type, keywords] of Object.entries(typeKeywords)) {
-                    if (
-                        keywords.some((keyword) =>
-                            lowerText.includes(keyword.toLowerCase())
-                        )
-                    ) {
-                        foundType = type;
-                        break;
-                    }
-                }
-
-                clothingType = foundType as any;
-                description = generatedText;
-            }
-        } catch (err) {
-            console.error(
-                'Failed to parse IDEFICS response:',
-                err,
-                generatedText
-            );
-            // Fallback values
-            description = 'Clothing item';
-            clothingType = 'Other';
-        }
-
-        // 5. Generate embedding
-        const embeddingRes = await fetch(
-            'https://api.openai.com/v1/embeddings',
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    input: description,
-                    model: OPENAI_EMBEDDING_MODEL,
-                }),
-            }
-        );
-
-        const embeddingData = await embeddingRes.json();
-        if (!embeddingRes.ok || !embeddingData.data?.[0]?.embedding) {
-            console.error('Embedding error:', embeddingData);
-            throw new Error('Failed to get embedding');
-        }
-
-        const embedding = embeddingData.data[0].embedding;
-
-        // 6. Insert into clothing_items
-        const { data: clothingItem, error: insertError } = await supabase
-            .from('clothing_items')
-            .insert({
-                wardrobe_id: wardrobeId,
-                image_url: imageUrl,
-                embedding,
-                type: clothingType,
-            })
-            .select('*')
-            .maybeSingle();
-
-        if (insertError) {
-            throw new Error(
-                `Failed to insert clothing item: ${insertError.message}`
-            );
-        }
-
-        // 7. Update user style vector
-        try {
-            const { error: vectorUpdateError } =
-                await supabase.functions.invoke('update-user-style-vector', {
-                    body: {
-                        user_id,
-                        clothing_item_id: clothingItem.id,
-                    },
-                });
-
-            if (vectorUpdateError) {
-                console.error(
-                    'Error updating user style vector:',
-                    vectorUpdateError
-                );
-            }
-        } catch (err) {
-            console.error('Failed to invoke update-user-style-vector:', err);
-        }
-
-        return new Response(
-            JSON.stringify({
-                success: true,
-                wardrobeId,
-                imageUrl,
-                description,
-                type: clothingType,
-                embedding,
-                clothingItem,
-            }),
+        // Create response object
+        const response = new Response(
+            JSON.stringify(earlyResponse),
             {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             }
         );
+
+        // Run the remaining tasks in the background
+        if (self.EdgeRuntime) {
+            self.EdgeRuntime.waitUntil((async () => {
+                try {
+                    console.log('Starting background processing for uploaded image');
+                    
+                    // 4. Call Flask server with base64 image
+                    let description = 'Clothing item';
+                    let clothingType: 'Tops' | 'Bottoms' | 'Outerwear' | 'Footwear' | 'Other' = 'Other';
+                    let embedding = null;
+                    
+                    try {
+                        console.log('Calling Flask server for image description');
+                        const ideficsResponse = await fetch(
+                            `${FLASK_SERVER_URL}/api/test/generate`,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    image_base64: imageBase64,
+                                }),
+                            }
+                        );
+
+                        // Error handling for non-JSON responses
+                        const contentType = ideficsResponse.headers.get('content-type');
+                        if (!contentType || !contentType.includes('application/json')) {
+                            const responseText = await ideficsResponse.text();
+                            console.error('Non-JSON response from Flask server:', responseText);
+                            throw new Error(
+                                `Flask server returned non-JSON response: ${ideficsResponse.status} ${ideficsResponse.statusText}`
+                            );
+                        }
+
+                        const ideficsData = await ideficsResponse.json();
+
+                        if (!ideficsResponse.ok || !ideficsData.success) {
+                            console.error('IDEFICS API error:', ideficsData);
+                            throw new Error('Failed to get clothing description from IDEFICS');
+                        }
+
+                        const generatedText = ideficsData.generated_text.trim();
+                        console.log('Generated description:', generatedText);
+
+                        // Parse the response to extract type and description
+                        try {
+                            // Look for the format "<Type>: <Description>"
+                            const formatMatch = generatedText.match(
+                                /^(Tops|Bottoms|Outerwear|Footwear|Other):\s*(.+)$/is
+                            );
+
+                            if (formatMatch) {
+                                // Extract type and description from the formatted response
+                                const extractedType = formatMatch[1].trim();
+                                description = formatMatch[2].trim();
+
+                                // Normalize the type to ensure exact match with our categories
+                                if (/^tops?$/i.test(extractedType)) clothingType = 'Tops';
+                                else if (/^bottoms?$/i.test(extractedType))
+                                    clothingType = 'Bottoms';
+                                else if (/^outerwear$/i.test(extractedType))
+                                    clothingType = 'Outerwear';
+                                else if (/^footwear$/i.test(extractedType))
+                                    clothingType = 'Footwear';
+                                else clothingType = 'Other';
+                            } else {
+                                // If we can't find the expected format, try to infer type and use rest as description
+                                const typeKeywords = {
+                                    Tops: [
+                                        'shirt',
+                                        'blouse',
+                                        't-shirt',
+                                        'top',
+                                        'sweater',
+                                        'tee',
+                                        'tank',
+                                    ],
+                                    Bottoms: [
+                                        'pants',
+                                        'jeans',
+                                        'shorts',
+                                        'skirt',
+                                        'trousers',
+                                        'leggings',
+                                    ],
+                                    Outerwear: [
+                                        'jacket',
+                                        'coat',
+                                        'hoodie',
+                                        'cardigan',
+                                        'blazer',
+                                        'vest',
+                                        'parka',
+                                    ],
+                                    Footwear: [
+                                        'shoes',
+                                        'boots',
+                                        'sneakers',
+                                        'sandals',
+                                        'heels',
+                                        'loafers',
+                                    ],
+                                };
+
+                                let foundType = 'Other';
+                                const lowerText = generatedText.toLowerCase();
+
+                                // Try to detect type based on keywords
+                                for (const [type, keywords] of Object.entries(typeKeywords)) {
+                                    if (
+                                        keywords.some((keyword) =>
+                                            lowerText.includes(keyword.toLowerCase())
+                                        )
+                                    ) {
+                                        foundType = type;
+                                        break;
+                                    }
+                                }
+
+                                clothingType = foundType as any;
+                                description = generatedText;
+                            }
+                        } catch (err) {
+                            console.error(
+                                'Failed to parse IDEFICS response:',
+                                err,
+                                generatedText
+                            );
+                            // Fallback values
+                            description = 'Clothing item';
+                            clothingType = 'Other';
+                        }
+                    } catch (flaskError) {
+                        console.error('Error with Flask server:', flaskError);
+                        // Continue with fallback values
+                    }
+
+                    // 5. Generate embedding
+                    try {
+                        console.log('Generating embedding for description:', description);
+                        const embeddingRes = await fetch(
+                            'https://api.openai.com/v1/embeddings',
+                            {
+                                method: 'POST',
+                                headers: {
+                                    Authorization: `Bearer ${OPENAI_API_KEY}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    input: description,
+                                    model: OPENAI_EMBEDDING_MODEL,
+                                }),
+                            }
+                        );
+
+                        const embeddingData = await embeddingRes.json();
+                        if (!embeddingRes.ok || !embeddingData.data?.[0]?.embedding) {
+                            console.error('Embedding error:', embeddingData);
+                            throw new Error('Failed to get embedding');
+                        }
+
+                        embedding = embeddingData.data[0].embedding;
+                    } catch (embeddingError) {
+                        console.error('Error generating embedding:', embeddingError);
+                        // Continue with null embedding
+                    }
+
+                    // 6. Insert into clothing_items
+                    try {
+                        console.log('Inserting clothing item into database');
+                        const { data: clothingItem, error: insertError } = await supabase
+                            .from('clothing_items')
+                            .insert({
+                                wardrobe_id: wardrobeId,
+                                image_url: imageUrl,
+                                embedding,
+                                type: clothingType,
+                            })
+                            .select('*')
+                            .maybeSingle();
+
+                        if (insertError) {
+                            throw new Error(
+                                `Failed to insert clothing item: ${insertError.message}`
+                            );
+                        }
+
+                        // 7. Update user style vector
+                        try {
+                            if (clothingItem) {
+                                console.log('Updating user style vector');
+                                await supabase.functions.invoke('update-user-style-vector', {
+                                    body: {
+                                        user_id,
+                                        clothing_item_id: clothingItem.id,
+                                    },
+                                });
+                            }
+                        } catch (styleError) {
+                            console.error('Failed to update user style vector:', styleError);
+                            // Continue despite style vector error
+                        }
+                    } catch (dbError) {
+                        console.error('Database operation error:', dbError);
+                    }
+
+                    console.log('Background processing completed for uploaded image');
+                } catch (backgroundError) {
+                    console.error('Error in background tasks:', backgroundError);
+                }
+            })());
+        }
+
+        return response;
     } catch (error) {
         console.error(error);
         return new Response(JSON.stringify({ error: error.message }), {

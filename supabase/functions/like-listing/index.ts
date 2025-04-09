@@ -2,14 +2,14 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.0';
 
-serve(async (req) => {
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers':
-            'Authorization, X-Client-Info, Content-Type, apikey',
-    };
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers':
+        'Authorization, X-Client-Info, Content-Type, apikey',
+};
 
+serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('OK', { headers: corsHeaders });
     }
@@ -144,24 +144,6 @@ serve(async (req) => {
                     console.error('Error inserting listing:', insertError);
                     throw new Error(`Error inserting listing: ${insertError.message}`);
                 }
-
-                // Generate embedding for the new listing
-                try {
-                    const { error: embeddingError } = await supabase.functions.invoke(
-                        'generate-listing-embedding',
-                        {
-                            body: { listing_id: item.id },
-                        }
-                    );
-
-                    if (embeddingError) {
-                        console.error('Error invoking generate-listing-embedding:', embeddingError);
-                        // Continue despite embedding error - we'll handle this later
-                    }
-                } catch (embeddingErr) {
-                    console.error('Failed to generate embedding:', embeddingErr);
-                    // Continue despite embedding error
-                }
             }
 
             // Now like the item (add record to liked_items)
@@ -180,33 +162,13 @@ serve(async (req) => {
                 console.error('Error inserting like:', likeErr);
                 throw likeErr;
             }
-
-            // Update user style vector using EMA with the new embedding
-            try {
-                const { error: vectorUpdateError } = await supabase.functions.invoke(
-                    'update-user-style-vector',
-                    {
-                        body: {
-                            user_id: userId,
-                            new_listing_id: item.id,
-                        },
-                    }
-                );
-
-                if (vectorUpdateError) {
-                    console.error('Error updating user style vector:', vectorUpdateError);
-                    // Continue despite vector update error
-                }
-            } catch (vectorErr) {
-                console.error('Failed to update style vector:', vectorErr);
-                // Continue despite vector update error
-            }
             
             success = true;
             message = 'Item liked successfully';
         }
 
-        return new Response(
+        // Prepare response immediately after core operation is complete
+        const response = new Response(
             JSON.stringify({
                 success,
                 message,
@@ -215,6 +177,55 @@ serve(async (req) => {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
         );
+
+        // Run remaining tasks in the background using Edge Runtime
+        if (success && self.EdgeRuntime) {
+            // Only do background tasks for new likes, not unlikes
+            self.EdgeRuntime.waitUntil((async () => {
+                try {
+                    console.log('Starting background tasks for item:', item.id);
+                    
+                    // Generate embedding for the new listing in the background
+                    try {
+                        if (!existingListing) {
+                            console.log('Generating embedding for new listing:', item.id);
+                            await supabase.functions.invoke(
+                                'generate-listing-embedding',
+                                {
+                                    body: { listing_id: item.id },
+                                }
+                            );
+                        }
+                    } catch (embeddingErr) {
+                        console.error('Failed to generate embedding (background task):', embeddingErr);
+                        // Continue despite embedding error
+                    }
+
+                    // Update user style vector using EMA with the new embedding
+                    try {
+                        console.log('Updating user style vector for user:', userId);
+                        await supabase.functions.invoke(
+                            'update-user-style-vector',
+                            {
+                                body: {
+                                    user_id: userId,
+                                    new_listing_id: item.id,
+                                },
+                            }
+                        );
+                    } catch (vectorErr) {
+                        console.error('Failed to update style vector (background task):', vectorErr);
+                        // Continue despite vector update error
+                    }
+                    
+                    console.log('Background tasks completed for item:', item.id);
+                } catch (error) {
+                    console.error('Error in background tasks:', error);
+                }
+            })());
+        }
+
+        return response;
     } catch (error) {
         console.error('Error in like-listing function:', error);
         return new Response(
