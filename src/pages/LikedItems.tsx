@@ -80,7 +80,7 @@ const LikedItems = () => {
   const handleDelete = async () => {
     // Unlike all selected items
     for (const id of selectedItems) {
-      await likeItemForUser(id); // This toggles the liked status
+      await toggleItemLike(id); // This toggles the liked status
     }
     
     // Update the UI
@@ -90,10 +90,18 @@ const LikedItems = () => {
   };
   
   const removeItem = async (id: string) => {
-    // Unlike the item
-    await likeItemForUser(id);
-    // Update the UI
-    setItems(items.filter(item => item.id !== id));
+    try {
+      // Unlike the item
+      const isNowLiked = await toggleItemLike(id);
+      
+      // Only remove from UI if successfully unliked
+      if (!isNowLiked) {
+        // Update the UI
+        setItems(items.filter(item => item.id !== id));
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
   };
 
   return (

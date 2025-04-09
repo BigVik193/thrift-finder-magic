@@ -32,7 +32,7 @@ serve(async (req) => {
         }
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        const { item, userId } = await req.json();
+        const { item, userId, currentlyLiked } = await req.json();
 
         if (!item || !item.id) {
             return new Response(
@@ -60,24 +60,31 @@ serve(async (req) => {
             );
         }
 
-        // Check if the user already liked this item
-        const { data: existingLike, error: checkError } = await supabase
-            .from('liked_items')
-            .select('user_id, listing_id')
-            .eq('user_id', userId)
-            .eq('listing_id', item.id)
-            .maybeSingle();
+        // Verify the current like status
+        let isCurrentlyLiked = currentlyLiked;
+        
+        if (isCurrentlyLiked === undefined) {
+            // If not provided, query the database to check
+            const { data: existingLike, error: checkError } = await supabase
+                .from('liked_items')
+                .select('user_id, listing_id')
+                .eq('user_id', userId)
+                .eq('listing_id', item.id)
+                .maybeSingle();
 
-        if (checkError) {
-            console.error('Error checking for existing like:', checkError);
-            throw new Error(`Error checking like status: ${checkError.message}`);
+            if (checkError) {
+                console.error('Error checking for existing like:', checkError);
+                throw new Error(`Error checking like status: ${checkError.message}`);
+            }
+            
+            isCurrentlyLiked = !!existingLike;
         }
 
         let success = false;
         let message = '';
 
-        if (existingLike) {
-            // If already liked, unlike it (remove the record)
+        if (isCurrentlyLiked) {
+            // Unlike: Remove the record
             const { error: unlikeError } = await supabase
                 .from('liked_items')
                 .delete()
@@ -85,13 +92,17 @@ serve(async (req) => {
                 .eq('listing_id', item.id);
 
             if (unlikeError) {
+                console.error('Error unliking item:', unlikeError);
                 throw new Error(`Error unliking item: ${unlikeError.message}`);
             }
             
-            success = false;
+            success = false; // Not liked anymore
             message = 'Item unliked successfully';
         } else {
-            // If not already in the database, check if the listing exists
+            // Like: Add the record after ensuring the listing exists
+            let listingExists = false;
+            
+            // Check if the listing already exists
             const { data: existingListing, error: listingError } = await supabase
                 .from('listings')
                 .select('id')
@@ -100,10 +111,13 @@ serve(async (req) => {
 
             if (listingError) {
                 console.error('Error checking for existing listing:', listingError);
+            } else {
+                listingExists = !!existingListing;
             }
 
-            // Validate required fields for new listings
-            if (!existingListing) {
+            // If listing doesn't exist, insert it
+            if (!listingExists) {
+                // Validate required fields for new listings
                 const requiredFields = ['title', 'price', 'currency', 'image', 'platform', 'url'];
                 const missingFields = requiredFields.filter(field => !item[field]);
                 
@@ -146,7 +160,7 @@ serve(async (req) => {
                 }
             }
 
-            // Now like the item (add record to liked_items)
+            // Like the item (add record to liked_items)
             try {
                 const { error: likeError } = await supabase
                     .from('liked_items')
@@ -156,21 +170,27 @@ serve(async (req) => {
                     });
 
                 if (likeError) {
-                    throw new Error(`Error liking item for user: ${likeError.message}`);
+                    // Check if this is a duplicate key error
+                    if (likeError.message.includes('duplicate key')) {
+                        console.log('Item already liked, handling gracefully');
+                        // Item is already liked, so we'll treat this as a success
+                    } else {
+                        throw new Error(`Error liking item for user: ${likeError.message}`);
+                    }
                 }
             } catch (likeErr) {
                 console.error('Error inserting like:', likeErr);
                 throw likeErr;
             }
             
-            success = true;
+            success = true; // Now liked
             message = 'Item liked successfully';
         }
 
         // Prepare response immediately after core operation is complete
         const response = new Response(
             JSON.stringify({
-                success,
+                success, // This now represents the new like state (true=liked, false=unliked)
                 message,
             }),
             {
@@ -187,8 +207,16 @@ serve(async (req) => {
                     
                     // Generate embedding for the new listing in the background
                     try {
-                        if (!existingListing) {
-                            console.log('Generating embedding for new listing:', item.id);
+                        // Check if listing exists and if it has an embedding
+                        const { data: listingData } = await supabase
+                            .from('listings')
+                            .select('embedding')
+                            .eq('id', item.id)
+                            .maybeSingle();
+                            
+                        // Only generate embedding if we don't have one yet
+                        if (!listingData?.embedding) {
+                            console.log('Generating embedding for listing:', item.id);
                             await supabase.functions.invoke(
                                 'generate-listing-embedding',
                                 {

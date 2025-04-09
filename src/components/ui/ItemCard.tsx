@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isItemLiked, likeItemForUser } from '@/services/listingService';
+import { isItemLiked, toggleItemLike } from '@/services/listingService';
 
 interface ItemCardProps {
   item: {
@@ -38,8 +38,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   // Check if the item is liked when component mounts
   useEffect(() => {
     const checkLikedStatus = async () => {
-      const likedStatus = await isItemLiked(item.id);
-      setIsLiked(likedStatus);
+      try {
+        const likedStatus = await isItemLiked(item.id);
+        setIsLiked(likedStatus);
+      } catch (error) {
+        console.error('Error checking like status:', error);
+      }
     };
     
     checkLikedStatus();
@@ -58,9 +62,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     if (isLikeInProgress) return;
     
     try {
-      // Optimistic UI update - toggle immediately for better UX
-      const newLikedStatus = !isLiked;
-      setIsLiked(newLikedStatus);
+      // Set in-progress state to prevent multiple clicks
       setIsLikeInProgress(true);
       
       // Prepare full item data for liking
@@ -78,19 +80,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         seller_feedback_score: item.seller_feedback_score || 0,
       };
       
-      // Call the like service
-      const serverLikedStatus = await likeItemForUser(item.id, fullItemData);
+      // Call the toggle service (handles both like and unlike)
+      const newLikedStatus = await toggleItemLike(item.id, fullItemData);
       
-      // If server response differs from our optimistic update, revert
-      if (serverLikedStatus !== newLikedStatus) {
-        setIsLiked(serverLikedStatus);
-      }
+      // Update local state based on the server response
+      setIsLiked(newLikedStatus);
       
-      if (onLike) onLike(item.id, serverLikedStatus);
+      // Call the parent's onLike callback if provided
+      if (onLike) onLike(item.id, newLikedStatus);
     } catch (error) {
       console.error('Error toggling like status:', error);
-      // Revert to previous state on error
-      setIsLiked(!isLiked);
     } finally {
       // Add a small delay before allowing more likes to prevent rapid clicking
       setTimeout(() => {

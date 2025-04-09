@@ -16,8 +16,8 @@ export interface Listing {
     url: string;
 }
 
-// Like or unlike an item for a user
-export const likeItemForUser = async (listingId: string, fullListingData?: Partial<Listing>): Promise<boolean> => {
+// Toggle like status (like or unlike) for an item
+export const toggleItemLike = async (listingId: string, fullListingData?: Partial<Listing>): Promise<boolean> => {
     try {
         const {
             data: { user },
@@ -35,6 +35,9 @@ export const likeItemForUser = async (listingId: string, fullListingData?: Parti
             return false;
         }
 
+        // Check current like status first
+        const currentlyLiked = await isItemLiked(listingId);
+
         // Get full item details if we have them or if it exists in our database
         const { data: existingListing } = await supabase
             .from('listings')
@@ -42,24 +45,23 @@ export const likeItemForUser = async (listingId: string, fullListingData?: Parti
             .eq('id', listingId)
             .maybeSingle();
 
-        // If the listing doesn't exist in our database yet, use the provided data or create minimal required data
+        // If the listing doesn't exist in our database yet, use the provided data
         const itemData = existingListing || fullListingData || { id: listingId };
         
-        // Check if we have all the required data
-        if (!existingListing && (!fullListingData?.platform || !fullListingData?.title || !fullListingData?.price)) {
+        // Check if we have all the required data for a new listing
+        if (!currentlyLiked && !existingListing && 
+            (!fullListingData?.platform || !fullListingData?.title || !fullListingData?.price)) {
             console.error('Missing required listing data for id:', listingId, 'Data:', fullListingData);
             toast.error('Unable to like item: Missing required data');
             return false;
         }
 
-        // First check the current like status
-        const isCurrentlyLiked = await isItemLiked(listingId);
-
-        // Use the like-listing edge function
+        // Call the like-listing edge function to handle the toggle
         const { data, error } = await supabase.functions.invoke('like-listing', {
             body: { 
                 item: itemData,
-                userId: user.id
+                userId: user.id,
+                currentlyLiked // Pass the current like status to the function
             },
         });
 
@@ -69,25 +71,26 @@ export const likeItemForUser = async (listingId: string, fullListingData?: Parti
         }
 
         // The edge function returns whether the item is now liked
-        const isLiked = data.success;
+        const isNowLiked = data.success;
         
-        // Show appropriate toast message
-        if (isCurrentlyLiked) {
-            toast.success('Item unliked successfully');
-        } else {
+        // Show appropriate toast message based on the returned status, not the previous status
+        if (isNowLiked) {
             toast.success('Item liked successfully');
+        } else {
+            toast.success('Item unliked successfully');
         }
 
-        return isLiked;
+        return isNowLiked;
     } catch (error) {
-        console.error('Error liking item for user:', error);
+        console.error('Error toggling item like status:', error);
         toast.error('Failed to update like status');
         return false;
     }
 };
 
 // Legacy alias for backward compatibility
-export const saveItemForUser = likeItemForUser;
+export const likeItemForUser = toggleItemLike;
+export const saveItemForUser = toggleItemLike;
 
 // Check if item is liked by user
 export const isItemLiked = async (listingId: string): Promise<boolean> => {
@@ -98,12 +101,17 @@ export const isItemLiked = async (listingId: string): Promise<boolean> => {
 
         if (!user) return false;
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('liked_items')
             .select('listing_id')
             .eq('user_id', user.id)
             .eq('listing_id', listingId)
             .maybeSingle();
+
+        if (error) {
+            console.error('Error checking if item is liked:', error);
+            return false;
+        }
 
         return !!data;
     } catch (error) {
